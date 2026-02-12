@@ -1,6 +1,19 @@
 {
   "name": "fireworks-ai",
   "version": "0.2.0",
+  "description": "React + Hono toolkit for building chat UIs on top of the Claude Agent SDK",
+  "license": "MIT",
+  "author": "Dan Leeper",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/quantumleeps/fireworks-ai.git"
+  },
+  "homepage": "https://github.com/quantumleeps/fireworks-ai#readme",
+  "bugs": {
+    "url": "https://github.com/quantumleeps/fireworks-ai/issues"
+  },
+  "keywords": ["claude", "agent-sdk", "react", "hono", "sse", "chat-ui", "anthropic"],
+  "sideEffects": false,
   "type": "module",
   "exports": {
     "./server": {
