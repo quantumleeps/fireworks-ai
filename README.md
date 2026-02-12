@@ -2,6 +2,16 @@
 
 A React + Hono toolkit for building chat UIs on top of the [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk). Tool calls, text deltas, and results are individual sparks — fireworks-ai launches them into a unified, vivid display.
 
+## Why fireworks-ai
+
+The Claude Agent SDK gives you a powerful agentic loop — but it's a server-side `AsyncGenerator` with no opinion on how to get those events to a browser. fireworks-ai bridges that gap:
+
+- **Multi-turn persistent sessions** — `PushChannel` + `SessionManager` let users send messages at any time. Messages queue and the SDK picks them up when ready — no "wait for the agent to finish" lockout.
+- **Named SSE event routing** — The SDK yields a flat stream of internal message types. The `MessageTranslator` reshapes them into semantically named SSE events (`text_delta`, `tool_start`, `tool_call`, `tool_result`, ...) that the browser's `EventSource` can route with native `addEventListener`.
+- **UI-friendly tool lifecycle** — Tool calls move through `pending` → `streaming_input` → `running` → `complete` phases with streaming JSON input, giving your UI fine-grained control over loading states and progressive rendering.
+- **Structured custom events** — Hook into tool results with `onToolResult` and emit typed `{ name, value }` events for app-specific reactivity (e.g. "document saved", "data refreshed") without touching the core protocol.
+- **Client-server separation** — Server handles transport (SSE encoding, session routing). Client handles state (Zustand store, React components). The translator is the clean seam between them.
+
 ## Install
 
 ```bash
@@ -22,47 +32,15 @@ Peer dependencies:
 }
 ```
 
-## Setup
-
-Fireworks components use Tailwind v4 utility classes and [shadcn/ui](https://ui.shadcn.com)-compatible CSS variable names (`bg-primary`, `text-muted-foreground`, `border-border`, etc.).
-
-### With shadcn/ui
-
-Your existing theme variables are already compatible. Add one line to your main CSS so Tailwind scans fireworks-ai's component source for utility classes:
-
-```css
-@import "tailwindcss";
-@source "../node_modules/fireworks-ai/src";
-```
-
-The `@source` path is relative to your CSS file — adjust if your stylesheet lives in a nested directory (e.g. `../../node_modules/fireworks-ai/src`).
-
-### Without shadcn/ui
-
-Import the bundled theme, which includes source scanning automatically:
-
-```css
-@import "tailwindcss";
-@import "fireworks-ai/theme.css";
-```
-
-This provides a neutral OKLCH palette with light + dark mode support and the Tailwind v4 `@theme inline` variable bridge.
-
-### Dark mode
-
-Dark mode activates via:
-- `.dark` class on `<html>` (recommended), or
-- `prefers-color-scheme: dark` system preference (automatic)
-
-Add `.light` to `<html>` to force light mode when using system preference detection.
-
-### Switching to shadcn later
-
-Drop the `fireworks-ai/theme.css` import and add `@source` — your shadcn theme takes over with zero migration.
-
 ## Server
 
 `fireworks-ai/server` gives you a Hono router that manages Agent SDK sessions and streams events to the client over SSE.
+
+The Claude Agent SDK reads your API key from the environment automatically. Make sure it's set before starting your server:
+
+```bash
+export ANTHROPIC_API_KEY=your-api-key
+```
 
 ```typescript
 import { Hono } from "hono";
@@ -119,21 +97,21 @@ The context is available in translator hooks (see below).
 
 ### Reacting to tool results
 
-Use `onToolResult` to inspect what the agent did and emit extra SSE events:
+Use `onToolResult` to inspect what the agent did and emit structured custom events:
 
 ```typescript
 const translator = new MessageTranslator<MyContext>({
   onToolResult: (toolName, result, session) => {
     if (toolName === "save_note") {
       session.context.history.push(result);
-      return [{ event: "notes_updated", data: JSON.stringify(session.context.history) }];
+      return [{ name: "notes_updated", value: session.context.history }];
     }
     return [];
   },
 });
 ```
 
-These extra events are forwarded to the client alongside built-in events.
+Each returned `{ name, value }` object is sent to the client as a `custom` SSE event.
 
 ## Client
 
@@ -166,20 +144,21 @@ Components use Tailwind utility classes and accept `className` for overrides.
 
 ### Custom events
 
-If your server emits app-specific SSE events (via `onToolResult`), declare them on the provider:
+If your server emits custom events (via `onToolResult`), handle them with `onCustomEvent`:
 
 ```tsx
 <AgentProvider
-  customEvents={["notes_updated"]}
-  onEvent={(e) => {
-    if (e.type === "notes_updated") {
-      myStore.getState().setNotes(e.data);
+  onCustomEvent={(e) => {
+    if (e.name === "notes_updated") {
+      myStore.getState().setNotes(e.value);
     }
   }}
 >
   <Chat />
 </AgentProvider>
 ```
+
+Each event is a typed `CustomEvent<T>` with `name` and `value` fields.
 
 ### Widgets
 
@@ -230,6 +209,44 @@ Each tool call moves through phases, reflected in `WidgetProps.phase`:
 | `complete` | `tool_result` event | `result` is JSON-parsed |
 | `error` | Error during execution | `error` message |
 
+## Styling
+
+Fireworks components use Tailwind v4 utility classes and [shadcn/ui](https://ui.shadcn.com)-compatible CSS variable names (`bg-primary`, `text-muted-foreground`, `border-border`, etc.).
+
+### With shadcn/ui
+
+Your existing theme variables are already compatible. Add one line to your main CSS so Tailwind scans fireworks-ai's component source for utility classes:
+
+```css
+@import "tailwindcss";
+@source "../node_modules/fireworks-ai/src";
+```
+
+The `@source` path is relative to your CSS file — adjust if your stylesheet lives in a nested directory (e.g. `../../node_modules/fireworks-ai/src`).
+
+### Without shadcn/ui
+
+Import the bundled theme, which includes source scanning automatically:
+
+```css
+@import "tailwindcss";
+@import "fireworks-ai/theme.css";
+```
+
+This provides a neutral OKLCH palette with light + dark mode support and the Tailwind v4 `@theme inline` variable bridge.
+
+### Dark mode
+
+Dark mode activates via:
+- `.dark` class on `<html>` (recommended), or
+- `prefers-color-scheme: dark` system preference (automatic)
+
+Add `.light` to `<html>` to force light mode when using system preference detection.
+
+### Switching to shadcn later
+
+Drop the `fireworks-ai/theme.css` import and add `@source` — your shadcn theme takes over with zero migration.
+
 ## API Reference
 
 ### `fireworks-ai/server`
@@ -279,6 +296,7 @@ Each tool call moves through phases, reflected in `WidgetProps.phase`:
 | `WidgetRegistration<TResult>` | Widget registration descriptor |
 | `ChatStore` | `StoreApi<ChatStoreShape>` — vanilla Zustand store |
 | `ChatStoreShape` | Full state + actions interface |
+| `CustomEvent<T>` | `{ name: string, value: T }` — structured app-level event |
 
 ## SSE Events
 
@@ -294,6 +312,7 @@ Events emitted by the server, handled automatically by `useAgent`:
 | `tool_result` | `{ toolUseId, result }` | Tool execution result |
 | `tool_progress` | `{ toolName, elapsed }` | Long-running tool heartbeat |
 | `turn_complete` | `{ numTurns, cost }` | Agent turn finished |
+| `custom` | `{ name, value }` | App-specific event from `onToolResult` |
 | `session_error` | `{ subtype }` | Session ended with error |
 
 ## License
