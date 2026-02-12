@@ -1,0 +1,301 @@
+# fireworks-ai
+
+A React + Hono toolkit for building chat UIs on top of the [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk). Tool calls, text deltas, and results are individual sparks — fireworks-ai launches them into a unified, vivid display.
+
+## Install
+
+```bash
+pnpm add fireworks-ai
+```
+
+Peer dependencies:
+
+```json
+{
+  "@anthropic-ai/claude-agent-sdk": ">=0.2.0",
+  "hono": ">=4.0.0",
+  "react": ">=18.0.0",
+  "react-markdown": ">=10.0.0",
+  "zustand": ">=5.0.0",
+  "immer": ">=10.0.0",
+  "tailwindcss": ">=4.0.0"
+}
+```
+
+## Setup
+
+Fireworks components use Tailwind v4 utility classes and [shadcn/ui](https://ui.shadcn.com)-compatible CSS variable names (`bg-primary`, `text-muted-foreground`, `border-border`, etc.).
+
+### With shadcn/ui
+
+Your existing theme variables are already compatible. Add one line to your main CSS so Tailwind scans fireworks-ai's component source for utility classes:
+
+```css
+@import "tailwindcss";
+@source "../node_modules/fireworks-ai/src";
+```
+
+The `@source` path is relative to your CSS file — adjust if your stylesheet lives in a nested directory (e.g. `../../node_modules/fireworks-ai/src`).
+
+### Without shadcn/ui
+
+Import the bundled theme, which includes source scanning automatically:
+
+```css
+@import "tailwindcss";
+@import "fireworks-ai/theme.css";
+```
+
+This provides a neutral OKLCH palette with light + dark mode support and the Tailwind v4 `@theme inline` variable bridge.
+
+### Dark mode
+
+Dark mode activates via:
+- `.dark` class on `<html>` (recommended), or
+- `prefers-color-scheme: dark` system preference (automatic)
+
+Add `.light` to `<html>` to force light mode when using system preference detection.
+
+### Switching to shadcn later
+
+Drop the `fireworks-ai/theme.css` import and add `@source` — your shadcn theme takes over with zero migration.
+
+## Server
+
+`fireworks-ai/server` gives you a Hono router that manages Agent SDK sessions and streams events to the client over SSE.
+
+```typescript
+import { Hono } from "hono";
+import { serve } from "@hono/node-server";
+import {
+  createAgentRouter,
+  SessionManager,
+  MessageTranslator,
+} from "fireworks-ai/server";
+
+const sessions = new SessionManager(() => ({
+  context: {},
+  model: "claude-sonnet-4-5-20250929",
+  systemPrompt: "You are a helpful assistant.",
+  maxTurns: 50,
+}));
+
+const translator = new MessageTranslator();
+
+const app = new Hono();
+app.route("/", createAgentRouter({ sessions, translator }));
+
+serve({ fetch: app.fetch, port: 3000 });
+```
+
+This gives you three endpoints:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/sessions` | Create a session, returns `{ sessionId }` |
+| `POST` | `/api/sessions/:id/messages` | Send `{ text }` to a session |
+| `GET` | `/api/sessions/:id/events` | SSE stream of agent events |
+
+### Session context
+
+`SessionManager` takes a factory function that runs once per session. The generic type parameter lets you attach per-session state:
+
+```typescript
+interface MyContext {
+  history: string[];
+}
+
+const sessions = new SessionManager<MyContext>(() => ({
+  context: { history: [] },
+  model: "claude-sonnet-4-5-20250929",
+  systemPrompt: "You are a helpful assistant.",
+  mcpServers: { myServer: createMyServer() },
+  allowedTools: ["mcp__myServer__*"],
+  maxTurns: 100,
+}));
+```
+
+The context is available in translator hooks (see below).
+
+### Reacting to tool results
+
+Use `onToolResult` to inspect what the agent did and emit extra SSE events:
+
+```typescript
+const translator = new MessageTranslator<MyContext>({
+  onToolResult: (toolName, result, session) => {
+    if (toolName === "save_note") {
+      session.context.history.push(result);
+      return [{ event: "notes_updated", data: JSON.stringify(session.context.history) }];
+    }
+    return [];
+  },
+});
+```
+
+These extra events are forwarded to the client alongside built-in events.
+
+## Client
+
+`fireworks-ai/react` provides a drop-in chat UI that connects to your server.
+
+```tsx
+import { AgentProvider, MessageList, ChatInput, useAgentContext } from "fireworks-ai/react";
+
+function App() {
+  return (
+    <AgentProvider>
+      <Chat />
+    </AgentProvider>
+  );
+}
+
+function Chat() {
+  const { sendMessage } = useAgentContext();
+
+  return (
+    <div className="flex h-screen flex-col">
+      <MessageList className="flex-1" />
+      <ChatInput onSend={sendMessage} />
+    </div>
+  );
+}
+```
+
+Components use Tailwind utility classes and accept `className` for overrides.
+
+### Custom events
+
+If your server emits app-specific SSE events (via `onToolResult`), declare them on the provider:
+
+```tsx
+<AgentProvider
+  customEvents={["notes_updated"]}
+  onEvent={(e) => {
+    if (e.type === "notes_updated") {
+      myStore.getState().setNotes(e.data);
+    }
+  }}
+>
+  <Chat />
+</AgentProvider>
+```
+
+### Widgets
+
+Register custom components for tool results. When a tool completes, `ToolCallCard` looks up the matching widget and renders it with typed props.
+
+```tsx
+import { registerWidget, type WidgetProps } from "fireworks-ai/react";
+
+interface SearchResult {
+  query: string;
+  results: { title: string; url: string }[];
+}
+
+function SearchWidget({ result }: WidgetProps<SearchResult>) {
+  if (!result) return null;
+  return (
+    <ul>
+      {result.results.map((r) => (
+        <li key={r.url}>
+          <a href={r.url}>{r.title}</a>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+registerWidget({
+  toolName: "search",
+  label: "Search",
+  richLabel: (r) => `Search: ${r.query}`,
+  component: SearchWidget,
+});
+```
+
+`toolName` matches the short name — MCP prefixes (`mcp__server__`) are stripped automatically. Call `registerWidget` at module scope; barrel-import your widgets directory so registrations run before render.
+
+Tool calls without a registered widget show a minimal status indicator.
+
+### Tool call lifecycle
+
+Each tool call moves through phases, reflected in `WidgetProps.phase`:
+
+| Phase | Trigger | What's available |
+|-------|---------|-----------------:|
+| `pending` | `tool_start` SSE event | `input: {}` |
+| `streaming_input` | `tool_input_delta` events | `partialInput` accumulates |
+| `running` | `tool_call` event (input finalized) | `input` is complete |
+| `complete` | `tool_result` event | `result` is JSON-parsed |
+| `error` | Error during execution | `error` message |
+
+## API Reference
+
+### `fireworks-ai/server`
+
+| Export | Description |
+|--------|-------------|
+| `SessionManager<TCtx>` | Manages agent sessions with per-session context |
+| `Session<TCtx>` | A single session — `id`, `context`, `pushMessage()`, `abort()` |
+| `SessionInit<TCtx>` | Factory return type — `model`, `systemPrompt`, `mcpServers`, etc. |
+| `MessageTranslator<TCtx>` | Converts SDK messages to SSE events |
+| `TranslatorConfig<TCtx>` | Translator options — `onToolResult` hook |
+| `createAgentRouter<TCtx>(config)` | Returns a Hono app with session + SSE routes |
+| `PushChannel<T>` | Async iterable queue for feeding messages to the SDK |
+| `sseEncode(event)` | Formats an `SSEEvent` as an SSE string |
+| `streamSession(session, translator)` | Async generator yielding `SSEEvent`s |
+
+### `fireworks-ai/react`
+
+| Export | Description |
+|--------|-------------|
+| `AgentProvider` | Context provider — wraps store + SSE connection |
+| `useAgentContext()` | Returns `{ sessionId, sendMessage, store }` |
+| `useChatStore(selector)` | Zustand selector hook into chat state |
+| `createChatStore()` | Creates a vanilla Zustand store (for advanced use) |
+| `useAgent(store, config?)` | SSE connection hook (used internally by `AgentProvider`) |
+| `MessageList` | Auto-scrolling message list with thinking indicator |
+| `TextMessage` | Markdown-rendered message bubble |
+| `ChatInput` | Textarea + send button |
+| `ToolCallCard` | Lifecycle-aware tool call display |
+| `ThinkingIndicator` | Animated dots shown while agent is generating |
+| `CollapsibleCard` | Expandable card wrapper |
+| `StatusDot` | Phase-colored status indicator |
+| `cn(...inputs)` | `clsx` + `tailwind-merge` utility for class merging |
+| `registerWidget(registration)` | Register a component for a tool name |
+| `getWidget(toolName)` | Look up a registered widget |
+| `stripMcpPrefix(name)` | `"mcp__server__tool"` → `"tool"` |
+
+### Types (re-exported from both entry points)
+
+| Type | Description |
+|------|-------------|
+| `SSEEvent` | `{ event: string, data: string }` |
+| `ChatMessage` | `{ id, role, content, toolCalls? }` |
+| `ToolCallInfo` | `{ id, name, input, partialInput?, result?, error?, status }` |
+| `ToolCallPhase` | `"pending" \| "streaming_input" \| "running" \| "complete" \| "error"` |
+| `WidgetProps<TResult>` | Props passed to widget components |
+| `WidgetRegistration<TResult>` | Widget registration descriptor |
+| `ChatStore` | `StoreApi<ChatStoreShape>` — vanilla Zustand store |
+| `ChatStoreShape` | Full state + actions interface |
+
+## SSE Events
+
+Events emitted by the server, handled automatically by `useAgent`:
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `message_start` | `{}` | Agent began generating a response |
+| `text_delta` | `{ text }` | Streaming text chunk |
+| `tool_start` | `{ id, name }` | Agent began calling a tool |
+| `tool_input_delta` | `{ id, partialJson }` | Streaming tool input JSON |
+| `tool_call` | `{ id, name, input }` | Tool input finalized |
+| `tool_result` | `{ toolUseId, result }` | Tool execution result |
+| `tool_progress` | `{ toolName, elapsed }` | Long-running tool heartbeat |
+| `turn_complete` | `{ numTurns, cost }` | Agent turn finished |
+| `session_error` | `{ subtype }` | Session ended with error |
+
+## License
+
+MIT
