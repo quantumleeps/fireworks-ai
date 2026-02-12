@@ -1,5 +1,6 @@
 export type {
   ChatMessage,
+  CustomEvent,
   SSEEvent,
   ToolCallInfo,
   ToolCallPhase,

@@ -1,5 +1,6 @@
 import { createContext, type ReactNode, useContext, useMemo, useRef } from "react";
 import { useStore } from "zustand";
+import type { CustomEvent } from "../types.js";
 import { type ChatStore, type ChatStoreShape, createChatStore } from "./store.js";
 import { type UseAgentConfig, type UseAgentReturn, useAgent } from "./use-agent.js";
 
@@ -11,8 +12,7 @@ const AgentContext = createContext<AgentContextValue | null>(null);
 
 export function AgentProvider(props: {
   endpoint?: string;
-  customEvents?: string[];
-  onEvent?: (event: { type: string; data: unknown }) => void;
+  onCustomEvent?: (event: CustomEvent) => void;
   children: ReactNode;
 }) {
   const storeRef = useRef<ChatStore | null>(null);
@@ -24,10 +24,9 @@ export function AgentProvider(props: {
   const agentConfig = useMemo<UseAgentConfig>(
     () => ({
       endpoint: props.endpoint,
-      customEvents: props.customEvents,
-      onEvent: props.onEvent,
+      onCustomEvent: props.onCustomEvent,
     }),
-    [props.endpoint, props.customEvents, props.onEvent],
+    [props.endpoint, props.onCustomEvent],
   );
 
   const agent = useAgent(store, agentConfig);

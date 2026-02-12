@@ -1,5 +1,4 @@
 import { type KeyboardEvent, useState } from "react";
-import { useChatStore } from "./AgentProvider.js";
 import { cn } from "./cn.js";
 
 export function ChatInput({
@@ -14,8 +13,7 @@ export function ChatInput({
   className?: string;
 }) {
   const [text, setText] = useState("");
-  const isStreaming = useChatStore((s) => s.isStreaming);
-  const isDisabled = disabled ?? isStreaming;
+  const isDisabled = disabled ?? false;
 
   function handleSend() {
     const trimmed = text.trim();

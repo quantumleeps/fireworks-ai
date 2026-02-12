@@ -7,6 +7,11 @@ export interface SSEEvent {
   data: string;
 }
 
+export interface CustomEvent<T = unknown> {
+  name: string;
+  value: T;
+}
+
 // --- Chat Store ---
 
 export type ToolCallPhase = "pending" | "streaming_input" | "running" | "complete" | "error";

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
+import type { CustomEvent } from "../types.js";
 import type { ChatStore } from "./store.js";
 
 export interface UseAgentConfig {
   endpoint?: string;
-  customEvents?: string[];
-  onEvent?: (event: { type: string; data: unknown }) => void;
+  onCustomEvent?: (event: CustomEvent) => void;
 }
 
 export interface UseAgentReturn {
@@ -14,8 +14,7 @@ export interface UseAgentReturn {
 
 export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentReturn {
   const endpoint = config?.endpoint ?? "/api";
-  const onEvent = config?.onEvent;
-  const customEvents = config?.customEvents;
+  const onCustomEvent = config?.onCustomEvent;
   const eventSourceRef = useRef<EventSource | null>(null);
 
   const sessionId = useSyncExternalStore(store.subscribe, () => store.getState().sessionId);
@@ -96,23 +95,17 @@ export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentRet
       }
     });
 
-    if (onEvent && customEvents) {
-      for (const eventType of customEvents) {
-        es.addEventListener(eventType, (e) => {
-          try {
-            onEvent({ type: eventType, data: JSON.parse(e.data) });
-          } catch {
-            onEvent({ type: eventType, data: e.data });
-          }
-        });
-      }
+    if (onCustomEvent) {
+      es.addEventListener("custom", (e) => {
+        onCustomEvent(JSON.parse(e.data) as CustomEvent);
+      });
     }
 
     return () => {
       es.close();
       eventSourceRef.current = null;
     };
-  }, [sessionId, endpoint, store, onEvent, customEvents]);
+  }, [sessionId, endpoint, store, onCustomEvent]);
 
   const sendMessage = useCallback(
     async (text: string) => {

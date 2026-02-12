@@ -1,8 +1,8 @@
-import type { SSEEvent } from "../types.js";
+import type { CustomEvent, SSEEvent } from "../types.js";
 import type { Session } from "./session.js";
 
 export interface TranslatorConfig<TCtx> {
-  onToolResult?: (toolName: string, result: string, session: Session<TCtx>) => SSEEvent[];
+  onToolResult?: (toolName: string, result: string, session: Session<TCtx>) => CustomEvent[];
 }
 
 export class MessageTranslator<TCtx> {
@@ -96,7 +96,9 @@ export class MessageTranslator<TCtx> {
               });
 
               if (this.config.onToolResult && toolName) {
-                events.push(...this.config.onToolResult(toolName, text, session));
+                for (const c of this.config.onToolResult(toolName, text, session)) {
+                  events.push({ event: "custom", data: JSON.stringify(c) });
+                }
               }
             }
           }
