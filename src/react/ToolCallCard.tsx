@@ -4,7 +4,7 @@ import { ApprovalButtons } from "./ApprovalButtons.js";
 import { CollapsibleCard } from "./CollapsibleCard.js";
 import { cn } from "./cn.js";
 import { getWidget, stripMcpPrefix } from "./registry.js";
-import { StatusDot } from "./StatusDot.js";
+import { PulsingDot, StatusDot } from "./StatusDot.js";
 
 export function ToolCallCard({
   toolCall,
@@ -21,9 +21,9 @@ export function ToolCallCard({
   const { respondToPermission, store } = useAgentContext();
   const isNonTerminal = toolCall.status !== "complete" && toolCall.status !== "error";
   const matchingApproval = isNonTerminal
-    ? (pendingPermissions.find(
-        (p) => p.kind === "tool_approval" && p.toolName === toolCall.name,
-      ) as ToolApprovalRequest | undefined)
+    ? (pendingPermissions.find((p) => p.kind === "tool_approval" && p.toolName === toolCall.name) as
+        | ToolApprovalRequest
+        | undefined)
     : undefined;
 
   if (toolCall.status === "complete" && toolCall.result && reg) {
@@ -34,8 +34,9 @@ export function ToolCallCard({
       parsed = toolCall.result;
     }
 
-    const displayLabel =
-      reg.richLabel ? (reg.richLabel(parsed as never, toolCall.input) ?? label) : label;
+    const displayLabel = reg.richLabel
+      ? (reg.richLabel(parsed as never, toolCall.input) ?? label)
+      : label;
 
     const widgetProps: WidgetProps = {
       phase: toolCall.status,
@@ -78,7 +79,7 @@ export function ToolCallCard({
         )}
       >
         <div className="flex items-center gap-2 text-muted-foreground">
-          <span className="inline-block h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
+          <PulsingDot />
           <span className="font-medium">{label}</span>
           {matchingApproval.description && (
             <span className="ml-1 opacity-70">&mdash; {matchingApproval.description}</span>
