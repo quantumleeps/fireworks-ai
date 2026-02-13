@@ -2,6 +2,7 @@ import type { ToolApprovalRequest } from "../types.js";
 import { ApprovalButtons } from "./ApprovalButtons.js";
 import { cn } from "./cn.js";
 import { getWidget, stripMcpPrefix } from "./registry.js";
+import { PulsingDot } from "./StatusDot.js";
 
 export function ToolApprovalCard({
   request,
@@ -26,7 +27,7 @@ export function ToolApprovalCard({
       )}
     >
       <div className="flex items-center gap-2 text-muted-foreground">
-        <span className="inline-block h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
+        <PulsingDot />
         <span className="font-medium">{label}</span>
         {request.description && (
           <span className="ml-1 opacity-70">&mdash; {request.description}</span>

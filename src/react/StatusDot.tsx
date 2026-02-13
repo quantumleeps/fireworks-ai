@@ -12,3 +12,14 @@ const phaseClasses: Record<ToolCallPhase, string> = {
 export function StatusDot({ status, className }: { status: ToolCallPhase; className?: string }) {
   return <span className={cn("h-2 w-2 shrink-0 rounded-full", phaseClasses[status], className)} />;
 }
+
+export function PulsingDot({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-block h-2 w-2 shrink-0 rounded-full bg-yellow-500 animate-pulse",
+        className,
+      )}
+    />
+  );
+}

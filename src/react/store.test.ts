@@ -197,4 +197,42 @@ describe("ChatStore", () => {
     expect(messages[0].role).toBe("system");
     expect(messages[0].content).toBe("Session ended");
   });
+
+  it("addPermissionRequest adds and deduplicates by requestId", () => {
+    const store = createChatStore();
+    const req = { kind: "tool_approval" as const, requestId: "r1", toolName: "t", input: {} };
+    store.getState().addPermissionRequest(req);
+    store.getState().addPermissionRequest(req);
+
+    expect(store.getState().pendingPermissions).toHaveLength(1);
+  });
+
+  it("removePermissionRequest removes by requestId", () => {
+    const store = createChatStore();
+    const req = { kind: "tool_approval" as const, requestId: "r1", toolName: "t", input: {} };
+    store.getState().addPermissionRequest(req);
+    store.getState().removePermissionRequest("r1");
+
+    expect(store.getState().pendingPermissions).toHaveLength(0);
+  });
+
+  it("completeToolCall does not overwrite error status", () => {
+    const store = createChatStore();
+    store.getState().startToolCall("tc-1", "search");
+    store.getState().errorToolCall("tc-1", "denied");
+    store.getState().completeToolCall("tc-1", "late result");
+
+    const tc = firstToolCall(store);
+    expect(tc.status).toBe("error");
+    expect(tc.result).toBeUndefined();
+  });
+
+  it("finalizeToolCall is a no-op for unknown toolUseId", () => {
+    const store = createChatStore();
+    store.getState().startToolCall("tc-1", "search");
+    store.getState().finalizeToolCall("unknown", "search", { q: "test" });
+
+    const tc = firstToolCall(store);
+    expect(tc.status).toBe("pending");
+  });
 });
