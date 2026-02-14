@@ -61,7 +61,7 @@ export class SessionManager<TCtx> {
 
     const canUseTool = isBypass
       ? undefined
-      : async (toolName: string, input: Record<string, unknown>) => {
+      : async (toolName: string, input: Record<string, unknown>, options: { toolUseID: string }) => {
           const requestId = crypto.randomUUID();
 
           if (toolName === "AskUserQuestion") {
@@ -84,6 +84,7 @@ export class SessionManager<TCtx> {
             kind: "tool_approval",
             requestId,
             toolName,
+            toolUseId: options.toolUseID,
             input,
             description: input.description as string | undefined,
           });

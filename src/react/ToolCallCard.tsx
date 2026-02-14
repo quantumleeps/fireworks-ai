@@ -1,7 +1,8 @@
-import type { ToolApprovalRequest, ToolCallInfo, WidgetProps } from "../types.js";
+import type { ToolCallInfo, WidgetProps } from "../types.js";
 import { useAgentContext, useChatStore } from "./AgentProvider.js";
 import { ApprovalButtons } from "./ApprovalButtons.js";
 import { CollapsibleCard } from "./CollapsibleCard.js";
+import { findMatchingApproval } from "./approval-matching.js";
 import { cn } from "./cn.js";
 import { getWidget, stripMcpPrefix } from "./registry.js";
 import { PulsingDot, StatusDot } from "./StatusDot.js";
@@ -19,12 +20,7 @@ export function ToolCallCard({
 
   const pendingPermissions = useChatStore((s) => s.pendingPermissions);
   const { respondToPermission, store } = useAgentContext();
-  const isNonTerminal = toolCall.status !== "complete" && toolCall.status !== "error";
-  const matchingApproval = isNonTerminal
-    ? (pendingPermissions.find((p) => p.kind === "tool_approval" && p.toolName === toolCall.name) as
-        | ToolApprovalRequest
-        | undefined)
-    : undefined;
+  const matchingApproval = findMatchingApproval(pendingPermissions, toolCall);
 
   if (toolCall.status === "complete" && toolCall.result && reg) {
     let parsed: unknown;
@@ -118,20 +114,26 @@ export function ToolCallCard({
     );
   }
 
+  const FallbackInputRenderer = reg?.inputRenderer;
+  const hasInput = Object.keys(toolCall.input).length > 0;
+
   return (
     <div
       className={cn(
-        "flex items-center gap-2 rounded-md border border-border bg-accent/50 px-2.5 py-1.5 text-xs text-muted-foreground",
+        "rounded-md border border-border bg-accent/50 px-2.5 py-1.5 text-xs text-muted-foreground",
         className,
       )}
     >
-      <StatusDot status={toolCall.status} />
-      <span>{label}</span>
-      {toolCall.status === "streaming_input" && toolCall.partialInput && (
-        <span className="ml-auto truncate max-w-[200px] opacity-50 font-mono text-[10px]">
-          {toolCall.partialInput.slice(0, 80)}
-        </span>
-      )}
+      <div className="flex items-center gap-2">
+        <StatusDot status={toolCall.status} />
+        <span>{label}</span>
+        {toolCall.status === "streaming_input" && toolCall.partialInput && (
+          <span className="ml-auto truncate max-w-[200px] opacity-50 font-mono text-[10px]">
+            {toolCall.partialInput.slice(0, 80)}
+          </span>
+        )}
+      </div>
+      {hasInput && FallbackInputRenderer && <FallbackInputRenderer input={toolCall.input} />}
     </div>
   );
 }

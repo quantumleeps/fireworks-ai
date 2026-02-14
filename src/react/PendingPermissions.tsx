@@ -1,4 +1,5 @@
 import { useAgentContext, useChatStore } from "./AgentProvider.js";
+import { isApprovalClaimedByToolCall } from "./approval-matching.js";
 import { cn } from "./cn.js";
 import { ToolApprovalCard } from "./ToolApprovalCard.js";
 import { UserQuestionCard } from "./UserQuestionCard.js";
@@ -10,23 +11,10 @@ export function PendingPermissions({ className }: { className?: string }) {
 
   // Tool approvals that match a non-terminal tool call are rendered inline
   // by ToolCallCard — skip them here to avoid duplicate UI.
-  const unclaimed = pending.filter((request) => {
-    if (request.kind !== "tool_approval") return true;
-    for (const msg of messages) {
-      if (msg.toolCalls) {
-        for (const tc of msg.toolCalls) {
-          if (
-            tc.name === request.toolName &&
-            tc.status !== "complete" &&
-            tc.status !== "error"
-          ) {
-            return false;
-          }
-        }
-      }
-    }
-    return true;
-  });
+  const unclaimed = pending.filter(
+    (request) =>
+      request.kind !== "tool_approval" || !isApprovalClaimedByToolCall(request, messages),
+  );
 
   if (!unclaimed.length) return null;
 
