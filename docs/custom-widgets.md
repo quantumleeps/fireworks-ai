@@ -2,7 +2,7 @@
 
 Register your own components for MCP tools or any tool the agent can call. When a tool completes, `ToolCallCard` looks up the matching widget and renders it instead of the default JSON fallback.
 
-<video src="custom-widget-demo.mp4" autoplay loop muted playsinline></video>
+https://github.com/user-attachments/assets/0b0d5a9c-27e2-4e8f-9f4a-e3d60f4a01e2
 
 ## End-to-end example
 
