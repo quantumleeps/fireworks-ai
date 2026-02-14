@@ -59,6 +59,7 @@ export interface ToolApprovalRequest {
   kind: "tool_approval";
   requestId: string;
   toolName: string;
+  toolUseId?: string;
   input: Record<string, unknown>;
   description?: string;
 }
