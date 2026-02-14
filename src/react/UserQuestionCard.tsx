@@ -14,7 +14,7 @@ export function UserQuestionCard({
   className?: string;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const [otherText, setOtherText] = useState<Record<string, string>>({});
   const otherInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -24,28 +24,30 @@ export function UserQuestionCard({
   }, []);
 
   const allAnswered = request.questions.every((q) => {
-    const val = answers[q.question];
-    if (!val) return false;
-    if (val === OTHER_LABEL) return !!otherText[q.question]?.trim();
+    const vals = answers[q.question];
+    if (!vals || vals.length === 0) return false;
+    if (vals.includes(OTHER_LABEL)) return !!otherText[q.question]?.trim();
     return true;
   });
 
   function resolvedAnswers() {
     const resolved: Record<string, string> = {};
     for (const q of request.questions) {
-      const val = answers[q.question] ?? "";
-      resolved[q.question] = val === OTHER_LABEL ? (otherText[q.question] ?? "") : val;
+      const vals = answers[q.question] ?? [];
+      const mapped = vals.map((v) => (v === OTHER_LABEL ? (otherText[q.question] ?? "") : v));
+      resolved[q.question] = mapped.join(", ");
     }
     return resolved;
   }
 
   function selectOption(question: string, label: string, multiSelect?: boolean) {
     setAnswers((prev) => {
-      if (!multiSelect) return { ...prev, [question]: label };
-      const current = prev[question] ?? "";
-      const labels = current ? current.split(", ") : [];
-      const next = labels.includes(label) ? labels.filter((l) => l !== label) : [...labels, label];
-      return { ...prev, [question]: next.join(", ") };
+      if (!multiSelect) return { ...prev, [question]: [label] };
+      const current = prev[question] ?? [];
+      return {
+        ...prev,
+        [question]: current.includes(label) ? current.filter((l) => l !== label) : [...current, label],
+      };
     });
     if (label === OTHER_LABEL) {
       setTimeout(() => otherInputRefs.current[question]?.focus(), 0);
@@ -114,7 +116,7 @@ export function UserQuestionCard({
             {hasOptions && (
               <div className="mt-1.5 flex flex-col gap-1">
                 {q.options?.map((opt, idx) => {
-                  const selected = (answers[q.question] ?? "").split(", ").includes(opt.label);
+                  const selected = (answers[q.question] ?? []).includes(opt.label);
                   return (
                     <button
                       key={opt.label}
@@ -151,7 +153,7 @@ export function UserQuestionCard({
 
                 {/* "Other" option */}
                 {(() => {
-                  const isOther = answers[q.question] === OTHER_LABEL;
+                  const isOther = (answers[q.question] ?? []).includes(OTHER_LABEL);
                   const otherIdx = (q.options?.length ?? 0) + 1;
                   return (
                     <div>
@@ -204,10 +206,12 @@ export function UserQuestionCard({
                 type="text"
                 className="mt-1.5 w-full rounded border border-border bg-background px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                 placeholder="Type your answer…"
-                value={answers[q.question] ?? ""}
-                onChange={(e) => setAnswers((prev) => ({ ...prev, [q.question]: e.target.value }))}
+                value={(answers[q.question] ?? [])[0] ?? ""}
+                onChange={(e) =>
+                  setAnswers((prev) => ({ ...prev, [q.question]: [e.target.value] }))
+                }
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && (answers[q.question] ?? "").trim()) {
+                  if (e.key === "Enter" && (answers[q.question]?.[0] ?? "").trim()) {
                     e.preventDefault();
                     onSubmit(resolvedAnswers());
                   }
