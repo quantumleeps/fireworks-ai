@@ -1,5 +1,6 @@
 // Built-in widgets (side-effect: auto-registers)
 import "./widgets/AskUserQuestionWidget.js";
+import "./widgets/WebFetchWidget.js";
 import "./widgets/WebSearchWidget.js";
 
 export type {
