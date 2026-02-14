@@ -3,6 +3,7 @@ import "./widgets/AskUserQuestionWidget.js";
 import "./widgets/BashWidget.js";
 import "./widgets/EditWidget.js";
 import "./widgets/GlobWidget.js";
+import "./widgets/GrepWidget.js";
 import "./widgets/ReadWidget.js";
 import "./widgets/WebFetchWidget.js";
 import "./widgets/WebSearchWidget.js";
