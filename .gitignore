@@ -27,5 +27,8 @@ service-account*.json
 *.sqlite
 *.db
 
+# example sandboxes
+sandboxes/
+
 # claude
 .claude/

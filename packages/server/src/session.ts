@@ -21,7 +21,9 @@ export interface SessionInit<TCtx> {
   mcpServers?: Record<string, unknown>;
   tools?: unknown[];
   allowedTools?: string[];
+  disallowedTools?: string[];
   maxTurns?: number;
+  cwd?: string;
   permissionMode?: "default" | "acceptEdits" | "plan" | "bypassPermissions";
   thinking?: { type: "enabled"; budgetTokens: number } | { type: "disabled" };
 }
@@ -115,6 +117,8 @@ export class SessionManager<TCtx> {
         abortController,
         ...(canUseTool ? { canUseTool } : {}),
         ...(init.thinking ? { thinking: init.thinking } : {}),
+        ...(init.cwd ? { cwd: init.cwd } : {}),
+        ...(init.disallowedTools ? { disallowedTools: init.disallowedTools } : {}),
       },
     });
 
