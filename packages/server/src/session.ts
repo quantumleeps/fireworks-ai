@@ -1,4 +1,9 @@
-import { query, type SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
+import {
+  type HookCallbackMatcher,
+  type HookEvent,
+  query,
+  type SDKUserMessage,
+} from "@anthropic-ai/claude-agent-sdk";
 import type { UserQuestion } from "@neeter/types";
 import { PermissionGate } from "./permission-gate.js";
 import { PushChannel } from "./push-channel.js";
@@ -26,6 +31,7 @@ export interface SessionInit<TCtx> {
   cwd?: string;
   permissionMode?: "default" | "acceptEdits" | "plan" | "bypassPermissions";
   thinking?: { type: "enabled"; budgetTokens: number } | { type: "disabled" };
+  hooks?: Partial<Record<HookEvent, HookCallbackMatcher[]>>;
 }
 
 export interface Session<TCtx> {
@@ -119,6 +125,7 @@ export class SessionManager<TCtx> {
         ...(init.thinking ? { thinking: init.thinking } : {}),
         ...(init.cwd ? { cwd: init.cwd } : {}),
         ...(init.disallowedTools ? { disallowedTools: init.disallowedTools } : {}),
+        ...(init.hooks ? { hooks: init.hooks } : {}),
       },
     });
 

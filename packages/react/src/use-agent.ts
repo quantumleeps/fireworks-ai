@@ -10,6 +10,7 @@ export interface UseAgentConfig {
 export interface UseAgentReturn {
   sessionId: string | null;
   sendMessage: (text: string) => Promise<void>;
+  stopSession: () => Promise<void>;
   respondToPermission: (response: PermissionResponse) => Promise<void>;
 }
 
@@ -96,11 +97,13 @@ export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentRet
       store.getState().setStreaming(false);
     });
 
-    es.addEventListener("turn_complete", () => {
+    es.addEventListener("turn_complete", (e) => {
+      const { cost, numTurns } = JSON.parse(e.data);
       store.getState().flushStreamingThinking();
       store.getState().flushStreamingText();
       store.getState().setThinking(false);
       store.getState().setStreaming(false);
+      store.getState().addCost(cost ?? 0, numTurns ?? 0);
     });
 
     es.addEventListener("error", () => {
@@ -138,6 +141,16 @@ export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentRet
     [sessionId, endpoint, store],
   );
 
+  const stopSession = useCallback(async () => {
+    if (!sessionId) return;
+    store.getState().flushStreamingThinking();
+    store.getState().flushStreamingText();
+    store.getState().setThinking(false);
+    store.getState().setStreaming(false);
+    store.getState().addSystemMessage("Interrupted");
+    await fetch(`${endpoint}/sessions/${sessionId}/abort`, { method: "POST" });
+  }, [sessionId, endpoint, store]);
+
   const respondToPermission = useCallback(
     async (response: PermissionResponse) => {
       if (!sessionId) return;
@@ -151,5 +164,5 @@ export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentRet
     [sessionId, endpoint, store],
   );
 
-  return { sessionId, sendMessage, respondToPermission };
+  return { sessionId, sendMessage, stopSession, respondToPermission };
 }

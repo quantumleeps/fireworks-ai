@@ -1,4 +1,5 @@
 export type { CustomEvent, SSEEvent } from "@neeter/types";
+export { createSandboxHook } from "./hooks.js";
 export { PermissionGate } from "./permission-gate.js";
 export { PushChannel } from "./push-channel.js";
 export { createAgentRouter } from "./router.js";

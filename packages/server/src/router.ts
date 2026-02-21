@@ -79,5 +79,13 @@ export function createAgentRouter<TCtx>(config: {
     return c.json({ ok: true });
   });
 
+  app.post(`${basePath}/sessions/:id/abort`, (c) => {
+    const session = sessions.get(c.req.param("id"));
+    if (!session) return c.json({ error: "Session not found" }, 404);
+
+    session.abort();
+    return c.json({ ok: true });
+  });
+
   return app;
 }
