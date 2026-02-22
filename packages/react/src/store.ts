@@ -32,6 +32,7 @@ interface ChatStoreActions {
   addPermissionRequest: (request: PermissionRequest) => void;
   removePermissionRequest: (requestId: string) => void;
   addCost: (cost: number, turns: number) => void;
+  cancelInflightToolCalls: () => void;
   reset: () => void;
 }
 
@@ -205,6 +206,24 @@ export function createChatStore(): ChatStore {
         set((s) => {
           s.totalCost += cost;
           s.totalTurns += turns;
+        }),
+
+      cancelInflightToolCalls: () =>
+        set((s) => {
+          for (const msg of s.messages) {
+            if (msg.toolCalls) {
+              for (const tc of msg.toolCalls) {
+                if (
+                  tc.status === "pending" ||
+                  tc.status === "streaming_input" ||
+                  tc.status === "running"
+                ) {
+                  tc.status = "error";
+                  tc.error = "Interrupted";
+                }
+              }
+            }
+          }
         }),
 
       reset: () =>

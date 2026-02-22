@@ -85,12 +85,12 @@ const sessions = new SessionManager<SessionContext>(() => {
 
   return {
     context: { sandboxDir },
-    model: "claude-sonnet-4-6",
+    model: "claude-haiku-4-5-20251001",
     cwd: sandboxDir,
     permissionMode: "default",
-    tools: ["Read", "Write", "Edit", "Glob", "Grep"],
-    allowedTools: ["Read", "Glob", "Grep", "Edit"],
-    disallowedTools: ["WebFetch", "WebSearch", "NotebookEdit", "TodoWrite"],
+    tools: ["Read", "Write", "Edit", "Glob", "Grep", "TodoWrite"],
+    allowedTools: ["Read", "Glob", "Grep", "Edit", "TodoWrite"],
+    disallowedTools: ["WebFetch", "WebSearch", "NotebookEdit"],
     hooks: {
       PreToolUse: createSandboxHook(sandboxDir, resolve),
     },

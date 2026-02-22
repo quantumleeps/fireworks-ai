@@ -69,7 +69,7 @@ export function ChatInput({
         <button
           type="button"
           onClick={onStop}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
         >
           <StopIcon />
         </button>
