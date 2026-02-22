@@ -12,6 +12,7 @@ const AgentContext = createContext<AgentContextValue | null>(null);
 
 export function AgentProvider(props: {
   endpoint?: string;
+  resumeSessionId?: string;
   onCustomEvent?: (event: CustomEvent) => void;
   children: ReactNode;
 }) {
@@ -24,9 +25,10 @@ export function AgentProvider(props: {
   const agentConfig = useMemo<UseAgentConfig>(
     () => ({
       endpoint: props.endpoint,
+      resumeSessionId: props.resumeSessionId,
       onCustomEvent: props.onCustomEvent,
     }),
-    [props.endpoint, props.onCustomEvent],
+    [props.endpoint, props.resumeSessionId, props.onCustomEvent],
   );
 
   const agent = useAgent(store, agentConfig);

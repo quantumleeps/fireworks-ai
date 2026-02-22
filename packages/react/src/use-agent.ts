@@ -4,6 +4,7 @@ import type { ChatStore } from "./store.js";
 
 export interface UseAgentConfig {
   endpoint?: string;
+  resumeSessionId?: string;
   onCustomEvent?: (event: CustomEvent) => void;
 }
 
@@ -13,11 +14,13 @@ export interface UseAgentReturn {
   sendMessage: (text: string) => Promise<void>;
   stopSession: () => Promise<void>;
   respondToPermission: (response: PermissionResponse) => Promise<void>;
-  resumeSession: (options?: { fork?: boolean }) => Promise<void>;
+  resumeSession: (options?: { fork?: boolean; sdkSessionId?: string }) => Promise<void>;
+  newSession: () => Promise<void>;
 }
 
 export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentReturn {
   const endpoint = config?.endpoint ?? "/api";
+  const resumeSessionId = config?.resumeSessionId;
   const onCustomEvent = config?.onCustomEvent;
   const eventSourceRef = useRef<EventSource | null>(null);
   const abortedRef = useRef(false);
@@ -28,7 +31,16 @@ export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentRet
   useEffect(() => {
     let cancelled = false;
     async function init() {
-      const res = await fetch(`${endpoint}/sessions`, { method: "POST" });
+      let res: Response;
+      if (resumeSessionId) {
+        res = await fetch(`${endpoint}/sessions/resume`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sdkSessionId: resumeSessionId }),
+        });
+      } else {
+        res = await fetch(`${endpoint}/sessions`, { method: "POST" });
+      }
       const data = await res.json();
       if (!cancelled) store.getState().setSessionId(data.sessionId);
     }
@@ -36,7 +48,7 @@ export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentRet
     return () => {
       cancelled = true;
     };
-  }, [endpoint, store]);
+  }, [endpoint, resumeSessionId, store]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -194,9 +206,9 @@ export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentRet
   );
 
   const resumeSession = useCallback(
-    async (options?: { fork?: boolean }) => {
-      const currentSdkSessionId = store.getState().sdkSessionId;
-      if (!currentSdkSessionId) return;
+    async (options?: { fork?: boolean; sdkSessionId?: string }) => {
+      const targetSdkSessionId = options?.sdkSessionId ?? store.getState().sdkSessionId;
+      if (!targetSdkSessionId) return;
 
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
@@ -209,7 +221,7 @@ export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentRet
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sdkSessionId: currentSdkSessionId,
+          sdkSessionId: targetSdkSessionId,
           forkSession: options?.fork,
         }),
       });
@@ -219,5 +231,26 @@ export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentRet
     [endpoint, store],
   );
 
-  return { sessionId, sdkSessionId, sendMessage, stopSession, respondToPermission, resumeSession };
+  const newSession = useCallback(async () => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+
+    store.getState().reset();
+
+    const res = await fetch(`${endpoint}/sessions`, { method: "POST" });
+    const data = await res.json();
+    store.getState().setSessionId(data.sessionId);
+  }, [endpoint, store]);
+
+  return {
+    sessionId,
+    sdkSessionId,
+    sendMessage,
+    stopSession,
+    respondToPermission,
+    resumeSession,
+    newSession,
+  };
 }
