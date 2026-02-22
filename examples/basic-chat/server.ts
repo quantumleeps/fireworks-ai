@@ -1,6 +1,10 @@
 import { serve } from "@hono/node-server";
 import { createAgentRouter, MessageTranslator, SessionManager } from "@neeter/server";
 
+// The Agent SDK spawns a Claude Code subprocess. If we're running inside
+// a Claude Code session, CLAUDECODE causes the subprocess to refuse to start.
+delete process.env.CLAUDECODE;
+
 const sessions = new SessionManager(() => ({
   context: {},
   model: "claude-sonnet-4-20250514",

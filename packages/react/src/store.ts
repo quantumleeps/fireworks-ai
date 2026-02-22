@@ -10,6 +10,8 @@ interface ChatStoreState {
   streamingText: string;
   streamingThinking: string;
   pendingPermissions: PermissionRequest[];
+  totalCost: number;
+  totalTurns: number;
 }
 
 interface ChatStoreActions {
@@ -29,6 +31,8 @@ interface ChatStoreActions {
   setThinking: (v: boolean) => void;
   addPermissionRequest: (request: PermissionRequest) => void;
   removePermissionRequest: (requestId: string) => void;
+  addCost: (cost: number, turns: number) => void;
+  cancelInflightToolCalls: () => void;
   reset: () => void;
 }
 
@@ -58,6 +62,8 @@ export function createChatStore(): ChatStore {
       streamingText: "",
       streamingThinking: "",
       pendingPermissions: [],
+      totalCost: 0,
+      totalTurns: 0,
 
       setSessionId: (id) =>
         set((s) => {
@@ -196,6 +202,30 @@ export function createChatStore(): ChatStore {
           s.pendingPermissions = s.pendingPermissions.filter((p) => p.requestId !== requestId);
         }),
 
+      addCost: (cost, turns) =>
+        set((s) => {
+          s.totalCost += cost;
+          s.totalTurns += turns;
+        }),
+
+      cancelInflightToolCalls: () =>
+        set((s) => {
+          for (const msg of s.messages) {
+            if (msg.toolCalls) {
+              for (const tc of msg.toolCalls) {
+                if (
+                  tc.status === "pending" ||
+                  tc.status === "streaming_input" ||
+                  tc.status === "running"
+                ) {
+                  tc.status = "error";
+                  tc.error = "Interrupted";
+                }
+              }
+            }
+          }
+        }),
+
       reset: () =>
         set((s) => {
           s.sessionId = null;
@@ -205,6 +235,8 @@ export function createChatStore(): ChatStore {
           s.streamingText = "";
           s.streamingThinking = "";
           s.pendingPermissions = [];
+          s.totalCost = 0;
+          s.totalTurns = 0;
         }),
     })),
   );

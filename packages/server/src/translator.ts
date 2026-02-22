@@ -232,6 +232,8 @@ export async function* streamSession<TCtx>(
           output.push(evt);
         }
       }
+    } catch {
+      // Session was aborted or SDK threw — fall through to close the channel
     } finally {
       unsubscribe();
       output.close();

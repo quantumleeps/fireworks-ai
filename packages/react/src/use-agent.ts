@@ -10,6 +10,7 @@ export interface UseAgentConfig {
 export interface UseAgentReturn {
   sessionId: string | null;
   sendMessage: (text: string) => Promise<void>;
+  stopSession: () => Promise<void>;
   respondToPermission: (response: PermissionResponse) => Promise<void>;
 }
 
@@ -17,6 +18,7 @@ export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentRet
   const endpoint = config?.endpoint ?? "/api";
   const onCustomEvent = config?.onCustomEvent;
   const eventSourceRef = useRef<EventSource | null>(null);
+  const abortedRef = useRef(false);
 
   const sessionId = useSyncExternalStore(store.subscribe, () => store.getState().sessionId);
 
@@ -38,6 +40,7 @@ export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentRet
 
     const es = new EventSource(`${endpoint}/sessions/${sessionId}/events`);
     eventSourceRef.current = es;
+    abortedRef.current = false;
 
     es.addEventListener("message_start", () => {
       store.getState().setThinking(true);
@@ -91,22 +94,45 @@ export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentRet
       store.getState().flushStreamingThinking();
       store.getState().flushStreamingText();
       store.getState().setThinking(false);
-      const { subtype } = JSON.parse(e.data);
-      store.getState().addSystemMessage(`Session ended: ${subtype}`);
       store.getState().setStreaming(false);
+      if (abortedRef.current) {
+        store.getState().cancelInflightToolCalls();
+        store.getState().addSystemMessage("Interrupted");
+        abortedRef.current = false;
+      } else {
+        const { subtype } = JSON.parse(e.data);
+        store.getState().addSystemMessage(`Session ended: ${subtype}`);
+      }
     });
 
-    es.addEventListener("turn_complete", () => {
+    es.addEventListener("turn_complete", (e) => {
+      const { cost, numTurns } = JSON.parse(e.data);
       store.getState().flushStreamingThinking();
       store.getState().flushStreamingText();
       store.getState().setThinking(false);
       store.getState().setStreaming(false);
+      store.getState().addCost(cost ?? 0, numTurns ?? 0);
+      if (abortedRef.current) {
+        store.getState().cancelInflightToolCalls();
+        store.getState().addSystemMessage("Interrupted");
+        abortedRef.current = false;
+      }
     });
 
     es.addEventListener("error", () => {
-      if (es.readyState === EventSource.CLOSED) {
+      if (abortedRef.current) {
         store.getState().flushStreamingThinking();
         store.getState().flushStreamingText();
+        store.getState().cancelInflightToolCalls();
+        store.getState().setThinking(false);
+        store.getState().setStreaming(false);
+        store.getState().addSystemMessage("Interrupted");
+        abortedRef.current = false;
+        es.close();
+      } else if (es.readyState === EventSource.CLOSED) {
+        store.getState().flushStreamingThinking();
+        store.getState().flushStreamingText();
+        store.getState().setThinking(false);
         store.getState().setStreaming(false);
       }
     });
@@ -138,6 +164,14 @@ export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentRet
     [sessionId, endpoint, store],
   );
 
+  const stopSession = useCallback(async () => {
+    if (!sessionId) return;
+    abortedRef.current = true;
+    store.getState().setThinking(false);
+    store.getState().setStreaming(false);
+    await fetch(`${endpoint}/sessions/${sessionId}/abort`, { method: "POST" });
+  }, [sessionId, endpoint, store]);
+
   const respondToPermission = useCallback(
     async (response: PermissionResponse) => {
       if (!sessionId) return;
@@ -151,5 +185,5 @@ export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentRet
     [sessionId, endpoint, store],
   );
 
-  return { sessionId, sendMessage, respondToPermission };
+  return { sessionId, sendMessage, stopSession, respondToPermission };
 }
