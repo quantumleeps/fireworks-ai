@@ -3,10 +3,10 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createSandboxHook } from "./hooks.js";
 
-function preToolUseInput(toolInput: Record<string, unknown>) {
+function preToolUseInput(toolInput: Record<string, unknown>, toolName = "Write") {
   return {
     hook_event_name: "PreToolUse" as const,
-    tool_name: "Write",
+    tool_name: toolName,
     tool_input: toolInput,
     tool_use_id: "test-id",
     session_id: "test-session",
@@ -118,5 +118,24 @@ describe("createSandboxHook", () => {
         reason: "Access outside sandbox directory is not allowed",
       });
     }
+  });
+
+  it("blocks Bash by default", async () => {
+    const result = await hook(preToolUseInput({ command: "cat /etc/passwd" }, "Bash"), "tool-1", {
+      signal: AbortSignal.timeout(5000),
+    });
+    expect(result).toEqual({
+      decision: "block",
+      reason: expect.stringContaining("Bash is blocked in sandbox mode"),
+    });
+  });
+
+  it("allows Bash when allowBash is true", async () => {
+    const permissiveHooks = createSandboxHook(sandboxDir, resolve, { allowBash: true });
+    const permissiveHook = permissiveHooks[0].hooks[0];
+    const result = await permissiveHook(preToolUseInput({ command: "ls -la" }, "Bash"), "tool-1", {
+      signal: AbortSignal.timeout(5000),
+    });
+    expect(result).toEqual({});
   });
 });
