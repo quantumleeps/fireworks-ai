@@ -79,14 +79,14 @@ Each returned `{ name, value }` object is sent to the client as a `custom` SSE e
 
 ## Permissions
 
-By default sessions run with `permissionMode: "bypassPermissions"` — all tools execute automatically. Set `permissionMode` to `"default"` (or `"acceptEdits"`) to require browser-side approval before each tool runs:
+By default sessions run with `permissionMode: "default"` — every tool call requires explicit browser-side approval. Set `permissionMode` to `"bypassPermissions"` to auto-approve all tools, or `"acceptEdits"` for a middle ground:
 
 ```typescript
 const sessions = new SessionManager(() => ({
   context: {},
   model: "claude-sonnet-4-5-20250929",
   systemPrompt: "You are a helpful assistant.",
-  permissionMode: "default",
+  permissionMode: "bypassPermissions",
 }));
 ```
 
@@ -105,10 +105,23 @@ The `PermissionGate` on each session manages the deferred promises internally �
 
 | Mode | Behavior |
 |------|----------|
-| `"bypassPermissions"` | All tools auto-approved (default) |
-| `"default"` | Every tool call requires explicit approval |
+| `"bypassPermissions"` | All tools auto-approved |
+| `"default"` | Every tool call requires explicit approval (default) |
 | `"acceptEdits"` | File edits auto-approved, other tools require approval |
 | `"plan"` | Planning mode — SDK-defined behavior |
+
+Tools listed in `allowedTools` are pre-approved by the SDK and skip the permission prompt, even when `permissionMode` is `"default"`. This lets you auto-approve safe operations while still gating destructive ones:
+
+```typescript
+const sessions = new SessionManager(() => ({
+  context: {},
+  model: "claude-sonnet-4-5-20250929",
+  systemPrompt: "You are a helpful assistant.",
+  tools: ["Read", "Write", "Edit", "Glob", "Grep"],
+  allowedTools: ["Read", "Glob", "Grep"],  // auto-approved
+  // Write and Edit will still require browser approval
+}));
+```
 
 ## Session resume & persistence
 
