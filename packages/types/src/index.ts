@@ -10,6 +10,19 @@ export interface CustomEvent<T = unknown> {
   value: T;
 }
 
+export interface SessionInitEvent {
+  sdkSessionId: string;
+  model: string;
+  tools: string[];
+}
+
+export interface SessionHistoryEntry {
+  sdkSessionId: string;
+  description: string;
+  createdAt: number;
+  lastActivityAt: number;
+}
+
 // --- Chat Store ---
 
 export type ToolCallPhase = "pending" | "streaming_input" | "running" | "complete" | "error";
@@ -77,3 +90,17 @@ export interface UserQuestionResponse {
 }
 
 export type PermissionResponse = ToolApprovalResponse | UserQuestionResponse;
+
+// --- Persistence ---
+
+export interface SessionRecord {
+  meta: SessionHistoryEntry;
+  events: SSEEvent[];
+}
+
+export interface SessionStore {
+  save(sdkSessionId: string, record: SessionRecord): Promise<void>;
+  load(sdkSessionId: string): Promise<SessionRecord | null>;
+  list(): Promise<SessionHistoryEntry[]>;
+  delete(sdkSessionId: string): Promise<void>;
+}

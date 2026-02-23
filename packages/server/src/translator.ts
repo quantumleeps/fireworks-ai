@@ -1,4 +1,4 @@
-import type { CustomEvent, SSEEvent } from "@neeter/types";
+import type { CustomEvent, SessionInitEvent, SSEEvent } from "@neeter/types";
 import { PushChannel } from "./push-channel.js";
 import type { Session } from "./session.js";
 
@@ -178,6 +178,23 @@ export class MessageTranslator<TCtx> {
         break;
       }
 
+      case "system": {
+        if (message.subtype === "init") {
+          const sdkSessionId = message.session_id as string;
+          session.sdkSessionId = sdkSessionId;
+          const initData: SessionInitEvent = {
+            sdkSessionId,
+            model: message.model as string,
+            tools: message.tools as string[],
+          };
+          events.push({
+            event: "session_init",
+            data: JSON.stringify(initData),
+          });
+        }
+        break;
+      }
+
       case "result": {
         if (message.subtype === "success") {
           events.push({
@@ -213,6 +230,7 @@ export function sseEncode(evt: SSEEvent): string {
 export async function* streamSession<TCtx>(
   session: Session<TCtx>,
   translator: MessageTranslator<TCtx>,
+  onEvent?: (evt: SSEEvent) => void,
 ): AsyncGenerator<SSEEvent> {
   const output = new PushChannel<SSEEvent>();
 
@@ -243,6 +261,7 @@ export async function* streamSession<TCtx>(
   driveMessages();
 
   for await (const evt of output) {
+    onEvent?.(evt);
     yield evt;
   }
 }

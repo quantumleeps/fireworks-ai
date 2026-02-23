@@ -4,7 +4,7 @@ import {
   query,
   type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
-import type { UserQuestion } from "@neeter/types";
+import type { SessionHistoryEntry, SessionStore, SSEEvent, UserQuestion } from "@neeter/types";
 import { PermissionGate } from "./permission-gate.js";
 import { PushChannel } from "./push-channel.js";
 
@@ -34,8 +34,16 @@ export interface SessionInit<TCtx> {
   hooks?: Partial<Record<HookEvent, HookCallbackMatcher[]>>;
 }
 
+export interface ResumeOptions {
+  sdkSessionId: string;
+  forkSession?: boolean;
+}
+
 export interface Session<TCtx> {
   id: string;
+  sdkSessionId?: string;
+  firstPrompt?: string;
+  cwd?: string;
   context: TCtx;
   pushMessage(text: string): void;
   messageIterator: AsyncIterable<SDKMessage>;
@@ -45,21 +53,111 @@ export interface Session<TCtx> {
   lastActivityAt: number;
 }
 
+export function sessionMeta(session: Session<unknown>): SessionHistoryEntry {
+  return {
+    sdkSessionId: session.sdkSessionId ?? "",
+    description: session.firstPrompt ?? "",
+    createdAt: session.createdAt,
+    lastActivityAt: session.lastActivityAt,
+  };
+}
+
 const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+
+export interface SessionManagerOptions {
+  idleTimeoutMs?: number;
+  store?: SessionStore;
+}
 
 export class SessionManager<TCtx> {
   private sessions = new Map<string, Session<TCtx>>();
-  private factory: () => SessionInit<TCtx>;
+  private factory: (original?: Session<TCtx>) => SessionInit<TCtx>;
   private idleTimeoutMs: number;
+  private store?: SessionStore;
 
-  constructor(factory: () => SessionInit<TCtx>, idleTimeoutMs?: number) {
+  constructor(
+    factory: (original?: Session<TCtx>) => SessionInit<TCtx>,
+    options?: number | SessionManagerOptions,
+  ) {
     this.factory = factory;
-    this.idleTimeoutMs = idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
+    if (typeof options === "number") {
+      this.idleTimeoutMs = options;
+    } else {
+      this.idleTimeoutMs = options?.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
+      this.store = options?.store;
+    }
   }
 
   create(): Session<TCtx> {
+    return this.buildSession(this.factory());
+  }
+
+  resume(options: ResumeOptions): Session<TCtx> {
+    const original = this.findBySdkSessionId(options.sdkSessionId);
+    const init = this.factory(original);
+
+    return this.buildSession(init, {
+      resume: options.sdkSessionId,
+      ...(options.forkSession ? { forkSession: true } : {}),
+    });
+  }
+
+  get(id: string): Session<TCtx> | undefined {
+    return this.sessions.get(id);
+  }
+
+  delete(id: string) {
+    const session = this.sessions.get(id);
+    if (session) {
+      session.abort();
+      this.sessions.delete(id);
+    }
+  }
+
+  findBySdkSessionId(sdkSessionId: string): Session<TCtx> | undefined {
+    for (const session of this.sessions.values()) {
+      if (session.sdkSessionId === sdkSessionId) return session;
+    }
+    return undefined;
+  }
+
+  getStore(): SessionStore | undefined {
+    return this.store;
+  }
+
+  async loadEvents(sdkSessionId: string): Promise<SSEEvent[]> {
+    if (!this.store) return [];
+    const record = await this.store.load(sdkSessionId);
+    return record?.events ?? [];
+  }
+
+  async listHistory(): Promise<SessionHistoryEntry[]> {
+    if (this.store) {
+      return this.store.list();
+    }
+    const entries: SessionHistoryEntry[] = [];
+    for (const session of this.sessions.values()) {
+      if (!session.sdkSessionId) continue;
+      entries.push(sessionMeta(session));
+    }
+    return entries.sort((a, b) => b.lastActivityAt - a.lastActivityAt);
+  }
+
+  cleanup() {
+    const now = Date.now();
+    for (const [id, session] of this.sessions) {
+      if (now - session.lastActivityAt > this.idleTimeoutMs) {
+        session.abort();
+        this.sessions.delete(id);
+      }
+    }
+  }
+
+  private buildSession(
+    init: SessionInit<TCtx>,
+    extraQueryOptions?: { resume?: string; forkSession?: boolean },
+  ): Session<TCtx> {
     const id = crypto.randomUUID();
-    const init = this.factory();
     const channel = new PushChannel<SDKUserMessage>();
     const abortController = new AbortController();
     const permissionGate = new PermissionGate();
@@ -126,14 +224,17 @@ export class SessionManager<TCtx> {
         ...(init.cwd ? { cwd: init.cwd } : {}),
         ...(init.disallowedTools ? { disallowedTools: init.disallowedTools } : {}),
         ...(init.hooks ? { hooks: init.hooks } : {}),
+        ...extraQueryOptions,
       },
     });
 
     const session: Session<TCtx> = {
       id,
+      cwd: init.cwd,
       context: init.context,
       pushMessage: (text: string) => {
         session.lastActivityAt = Date.now();
+        if (!session.firstPrompt) session.firstPrompt = text;
         channel.push(userMessage(text));
       },
       messageIterator,
@@ -148,27 +249,5 @@ export class SessionManager<TCtx> {
 
     this.sessions.set(id, session);
     return session;
-  }
-
-  get(id: string): Session<TCtx> | undefined {
-    return this.sessions.get(id);
-  }
-
-  delete(id: string) {
-    const session = this.sessions.get(id);
-    if (session) {
-      session.abort();
-      this.sessions.delete(id);
-    }
-  }
-
-  cleanup() {
-    const now = Date.now();
-    for (const [id, session] of this.sessions) {
-      if (now - session.lastActivityAt > this.idleTimeoutMs) {
-        session.abort();
-        this.sessions.delete(id);
-      }
-    }
   }
 }

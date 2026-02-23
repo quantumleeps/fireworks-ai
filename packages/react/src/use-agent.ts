@@ -1,31 +1,64 @@
-import type { CustomEvent, PermissionRequest, PermissionResponse } from "@neeter/types";
-import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
-import type { ChatStore } from "./store.js";
+import type {
+  CustomEvent,
+  PermissionRequest,
+  PermissionResponse,
+  SessionHistoryEntry,
+  SSEEvent,
+} from "@neeter/types";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { type ChatStore, replayEvents } from "./store.js";
 
 export interface UseAgentConfig {
   endpoint?: string;
+  resumeSessionId?: string;
   onCustomEvent?: (event: CustomEvent) => void;
 }
 
 export interface UseAgentReturn {
   sessionId: string | null;
+  sdkSessionId: string | null;
+  sessionHistory: SessionHistoryEntry[];
   sendMessage: (text: string) => Promise<void>;
   stopSession: () => Promise<void>;
   respondToPermission: (response: PermissionResponse) => Promise<void>;
+  resumeSession: (options?: { fork?: boolean; sdkSessionId?: string }) => Promise<void>;
+  newSession: () => Promise<void>;
+  refreshHistory: () => Promise<void>;
 }
 
 export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentReturn {
   const endpoint = config?.endpoint ?? "/api";
+  const resumeSessionId = config?.resumeSessionId;
   const onCustomEvent = config?.onCustomEvent;
   const eventSourceRef = useRef<EventSource | null>(null);
   const abortedRef = useRef(false);
 
   const sessionId = useSyncExternalStore(store.subscribe, () => store.getState().sessionId);
+  const sdkSessionId = useSyncExternalStore(store.subscribe, () => store.getState().sdkSessionId);
+  const [sessionHistory, setSessionHistory] = useState<SessionHistoryEntry[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     async function init() {
-      const res = await fetch(`${endpoint}/sessions`, { method: "POST" });
+      let res: Response;
+      if (resumeSessionId) {
+        try {
+          const eventsRes = await fetch(`${endpoint}/sessions/replay/${resumeSessionId}`);
+          if (eventsRes.ok && !cancelled) {
+            const events: SSEEvent[] = await eventsRes.json();
+            replayEvents(store, events);
+          }
+        } catch {
+          /* replay is best-effort */
+        }
+        res = await fetch(`${endpoint}/sessions/resume`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sdkSessionId: resumeSessionId }),
+        });
+      } else {
+        res = await fetch(`${endpoint}/sessions`, { method: "POST" });
+      }
       const data = await res.json();
       if (!cancelled) store.getState().setSessionId(data.sessionId);
     }
@@ -33,7 +66,7 @@ export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentRet
     return () => {
       cancelled = true;
     };
-  }, [endpoint, store]);
+  }, [endpoint, resumeSessionId, store]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -41,6 +74,11 @@ export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentRet
     const es = new EventSource(`${endpoint}/sessions/${sessionId}/events`);
     eventSourceRef.current = es;
     abortedRef.current = false;
+
+    es.addEventListener("session_init", (e) => {
+      const { sdkSessionId: id } = JSON.parse(e.data);
+      store.getState().setSdkSessionId(id);
+    });
 
     es.addEventListener("message_start", () => {
       store.getState().setThinking(true);
@@ -185,5 +223,73 @@ export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentRet
     [sessionId, endpoint, store],
   );
 
-  return { sessionId, sendMessage, stopSession, respondToPermission };
+  const resumeSession = useCallback(
+    async (options?: { fork?: boolean; sdkSessionId?: string }) => {
+      const targetSdkSessionId = options?.sdkSessionId ?? store.getState().sdkSessionId;
+      if (!targetSdkSessionId) return;
+
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+
+      store.getState().reset();
+
+      try {
+        const eventsRes = await fetch(`${endpoint}/sessions/replay/${targetSdkSessionId}`);
+        if (eventsRes.ok) {
+          const events: SSEEvent[] = await eventsRes.json();
+          replayEvents(store, events);
+        }
+      } catch {
+        /* replay is best-effort */
+      }
+
+      const res = await fetch(`${endpoint}/sessions/resume`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sdkSessionId: targetSdkSessionId,
+          forkSession: options?.fork,
+        }),
+      });
+      const data = await res.json();
+      store.getState().setSessionId(data.sessionId);
+    },
+    [endpoint, store],
+  );
+
+  const refreshHistory = useCallback(async () => {
+    try {
+      const res = await fetch(`${endpoint}/sessions/history`);
+      if (res.ok) setSessionHistory(await res.json());
+    } catch {
+      /* ignore */
+    }
+  }, [endpoint]);
+
+  const newSession = useCallback(async () => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+
+    store.getState().reset();
+
+    const res = await fetch(`${endpoint}/sessions`, { method: "POST" });
+    const data = await res.json();
+    store.getState().setSessionId(data.sessionId);
+  }, [endpoint, store]);
+
+  return {
+    sessionId,
+    sdkSessionId,
+    sessionHistory,
+    sendMessage,
+    stopSession,
+    respondToPermission,
+    resumeSession,
+    newSession,
+    refreshHistory,
+  };
 }

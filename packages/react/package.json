@@ -32,15 +32,19 @@
     "tailwind-merge": "^3.4.0"
   },
   "peerDependencies": {
+    "immer": ">=10.0.0",
     "react": ">=18.0.0",
     "react-markdown": ">=10.0.0",
-    "zustand": ">=5.0.0",
-    "immer": ">=10.0.0"
+    "zustand": ">=5.0.0"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
     "immer": "^11.1.4",
+    "jsdom": "^28.1.0",
     "react": "^19.2.0",
+    "react-dom": "^19.2.4",
     "zustand": "^5.0.11"
   }
 }
