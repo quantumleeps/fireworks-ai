@@ -1,7 +1,14 @@
-import { AgentProvider, ChatInput, MessageList, useAgentContext } from "@neeter/react";
+import {
+  AgentProvider,
+  ChatInput,
+  MessageList,
+  useAgentContext,
+  useChatStore,
+} from "@neeter/react";
 
 function Chat() {
-  const { sendMessage } = useAgentContext();
+  const { sendMessage, stopSession } = useAgentContext();
+  const isStreaming = useChatStore((s) => s.isStreaming);
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
@@ -10,7 +17,7 @@ function Chat() {
       </header>
       <MessageList className="flex-1" />
       <div className="border-t">
-        <ChatInput onSend={sendMessage} />
+        <ChatInput onSend={sendMessage} onStop={stopSession} isStreaming={isStreaming} />
       </div>
     </div>
   );
