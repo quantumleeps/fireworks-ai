@@ -64,7 +64,7 @@ Re-exported from both `@neeter/server` and `@neeter/react`:
 | `WidgetProps<TResult>` | Props passed to widget components |
 | `WidgetRegistration<TResult>` | Widget registration — `toolName`, `label`, `richLabel?`, `inputRenderer?`, `component` |
 | `ChatStore` | `StoreApi<ChatStoreShape>` — vanilla Zustand store |
-| `ChatStoreShape` | Full state + actions interface |
+| `ChatStoreShape` | Full state + actions interface (includes `totalCost`, `totalTurns`, `totalInputTokens`, `totalOutputTokens`, `modelUsage`) |
 | `CustomEvent<T>` | `{ name: string, value: T }` — structured app-level event |
 | `SessionInitEvent` | `{ sdkSessionId, model, tools }` — session initialization payload |
 | `SessionHistoryEntry` | `{ sdkSessionId, description, createdAt, lastActivityAt }` — session metadata |
@@ -78,6 +78,9 @@ Re-exported from both `@neeter/server` and `@neeter/react`:
 | `UserQuestionOption` | `{ label, description, markdown? }` — single option in a `UserQuestion` |
 | `UserQuestionRequest` | `{ kind, requestId, questions: UserQuestion[] }` |
 | `UserQuestionResponse` | `{ kind, requestId, answers: Record<string, string> }` |
+| `TokenUsage` | `{ inputTokens, outputTokens, cacheCreationInputTokens, cacheReadInputTokens }` |
+| `ModelUsage` | `TokenUsage` + `{ webSearchRequests, costUSD, contextWindow }` — per-model breakdown |
+| `TurnCompleteData` | `{ numTurns, cost, usage: TokenUsage \| null, modelUsage: Record<string, ModelUsage> \| null }` |
 
 ---
 
