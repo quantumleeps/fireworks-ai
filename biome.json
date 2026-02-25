@@ -1,7 +1,15 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.0.0/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.4/schema.json",
   "files": {
-    "includes": ["**", "!**/dist", "!**/sandboxes", "!**/.neeter-data"]
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/sandboxes",
+      "!**/.neeter-data",
+      "!**/.source",
+      "!**/.next",
+      "!**/out"
+    ]
   },
   "formatter": {
     "indentStyle": "space",
