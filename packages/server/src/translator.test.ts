@@ -219,15 +219,98 @@ describe("MessageTranslator", () => {
   it("emits turn_complete on success result without usage", () => {
     const t = new MessageTranslator();
     const events = t.translate(
-      { type: "result", subtype: "success", num_turns: 3, total_cost_usd: 0.05 },
+      {
+        type: "result",
+        subtype: "success",
+        num_turns: 3,
+        total_cost_usd: 0.05,
+        stop_reason: "end_turn",
+      },
       session,
     );
     expect(events).toEqual([
       {
         event: "turn_complete",
-        data: JSON.stringify({ numTurns: 3, cost: 0.05, usage: null, modelUsage: null }),
+        data: JSON.stringify({
+          numTurns: 3,
+          cost: 0.05,
+          stopReason: "end_turn",
+          usage: null,
+          modelUsage: null,
+        }),
       },
     ]);
+  });
+
+  it("emits turn_complete with stopReason null when stop_reason absent", () => {
+    const t = new MessageTranslator();
+    const events = t.translate(
+      { type: "result", subtype: "success", num_turns: 1, total_cost_usd: 0.01 },
+      session,
+    );
+    const data = JSON.parse(events[0].data);
+    expect(data.stopReason).toBeNull();
+  });
+
+  it("falls back to stream stop_reason when result stop_reason is null", () => {
+    const t = new MessageTranslator();
+    // Simulate message_delta with stop_reason (as the SDK streams it)
+    t.translate(
+      {
+        type: "stream_event",
+        event: { type: "message_delta", delta: { stop_reason: "end_turn" } },
+      },
+      session,
+    );
+    // Result arrives with stop_reason: null (SDK bug)
+    const events = t.translate(
+      { type: "result", subtype: "success", num_turns: 1, total_cost_usd: 0.01, stop_reason: null },
+      session,
+    );
+    const data = JSON.parse(events[0].data);
+    expect(data.stopReason).toBe("end_turn");
+  });
+
+  it("prefers result stop_reason over stream fallback when both present", () => {
+    const t = new MessageTranslator();
+    // Stream says end_turn
+    t.translate(
+      {
+        type: "stream_event",
+        event: { type: "message_delta", delta: { stop_reason: "end_turn" } },
+      },
+      session,
+    );
+    // Result explicitly says refusal
+    const events = t.translate(
+      {
+        type: "result",
+        subtype: "success",
+        num_turns: 1,
+        total_cost_usd: 0.01,
+        stop_reason: "refusal",
+      },
+      session,
+    );
+    const data = JSON.parse(events[0].data);
+    expect(data.stopReason).toBe("refusal");
+  });
+
+  it("uses stream stop_reason for error results when result stop_reason is null", () => {
+    const t = new MessageTranslator();
+    t.translate(
+      {
+        type: "stream_event",
+        event: { type: "message_delta", delta: { stop_reason: "end_turn" } },
+      },
+      session,
+    );
+    const events = t.translate(
+      { type: "result", subtype: "error_max_turns", stop_reason: null },
+      session,
+    );
+    const data = JSON.parse(events[0].data);
+    expect(data.stopReason).toBe("end_turn");
   });
 
   it("emits turn_complete with usage and modelUsage when present", () => {
@@ -238,6 +321,7 @@ describe("MessageTranslator", () => {
         subtype: "success",
         num_turns: 5,
         total_cost_usd: 0.12,
+        stop_reason: "end_turn",
         usage: {
           input_tokens: 1000,
           output_tokens: 500,
@@ -270,12 +354,26 @@ describe("MessageTranslator", () => {
     expect(data.modelUsage["claude-sonnet-4-20250514"].costUSD).toBe(0.12);
   });
 
-  it("emits session_error on non-success result", () => {
+  it("emits session_error on non-success result with stopReason", () => {
+    const t = new MessageTranslator();
+    const events = t.translate(
+      { type: "result", subtype: "error_max_turns", stop_reason: "end_turn" },
+      session,
+    );
+    expect(events).toEqual([
+      {
+        event: "session_error",
+        data: JSON.stringify({ subtype: "error_max_turns", stopReason: "end_turn" }),
+      },
+    ]);
+  });
+
+  it("emits session_error with null stopReason when stop_reason absent", () => {
     const t = new MessageTranslator();
     const events = t.translate({ type: "result", subtype: "max_turns" }, session);
-    expect(events).toEqual([
-      { event: "session_error", data: JSON.stringify({ subtype: "max_turns" }) },
-    ]);
+    const data = JSON.parse(events[0].data);
+    expect(data.subtype).toBe("max_turns");
+    expect(data.stopReason).toBeNull();
   });
 
   it("emits thinking_start on content_block_start with thinking", () => {
