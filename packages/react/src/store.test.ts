@@ -238,22 +238,119 @@ describe("ChatStore", () => {
 
   it("addCost accumulates cost and turns", () => {
     const store = createChatStore();
-    store.getState().addCost(0.005, 1);
-    store.getState().addCost(0.012, 2);
+    store.getState().addCost({ cost: 0.005, numTurns: 1, usage: null, modelUsage: null });
+    store.getState().addCost({ cost: 0.012, numTurns: 2, usage: null, modelUsage: null });
 
     const s = store.getState();
     expect(s.totalCost).toBeCloseTo(0.017);
     expect(s.totalTurns).toBe(3);
   });
 
-  it("reset clears cost and turns", () => {
+  it("addCost accumulates token counts from usage", () => {
     const store = createChatStore();
-    store.getState().addCost(0.01, 1);
+    store.getState().addCost({
+      cost: 0.05,
+      numTurns: 1,
+      usage: {
+        inputTokens: 1000,
+        outputTokens: 500,
+        cacheCreationInputTokens: 0,
+        cacheReadInputTokens: 0,
+      },
+      modelUsage: null,
+    });
+    store.getState().addCost({
+      cost: 0.03,
+      numTurns: 1,
+      usage: {
+        inputTokens: 800,
+        outputTokens: 200,
+        cacheCreationInputTokens: 0,
+        cacheReadInputTokens: 0,
+      },
+      modelUsage: null,
+    });
+
+    const s = store.getState();
+    expect(s.totalInputTokens).toBe(1800);
+    expect(s.totalOutputTokens).toBe(700);
+  });
+
+  it("addCost merges modelUsage across turns", () => {
+    const store = createChatStore();
+    store.getState().addCost({
+      cost: 0.05,
+      numTurns: 1,
+      usage: null,
+      modelUsage: {
+        "claude-sonnet-4-20250514": {
+          inputTokens: 1000,
+          outputTokens: 500,
+          cacheCreationInputTokens: 0,
+          cacheReadInputTokens: 0,
+          webSearchRequests: 0,
+          costUSD: 0.05,
+          contextWindow: 200000,
+        },
+      },
+    });
+    store.getState().addCost({
+      cost: 0.03,
+      numTurns: 1,
+      usage: null,
+      modelUsage: {
+        "claude-sonnet-4-20250514": {
+          inputTokens: 800,
+          outputTokens: 200,
+          cacheCreationInputTokens: 0,
+          cacheReadInputTokens: 0,
+          webSearchRequests: 1,
+          costUSD: 0.03,
+          contextWindow: 200000,
+        },
+      },
+    });
+
+    const s = store.getState();
+    const model = s.modelUsage?.["claude-sonnet-4-20250514"];
+    expect(model).toBeDefined();
+    expect(model?.inputTokens).toBe(1800);
+    expect(model?.outputTokens).toBe(700);
+    expect(model?.webSearchRequests).toBe(1);
+    expect(model?.costUSD).toBeCloseTo(0.08);
+  });
+
+  it("reset clears cost, turns, and token state", () => {
+    const store = createChatStore();
+    store.getState().addCost({
+      cost: 0.01,
+      numTurns: 1,
+      usage: {
+        inputTokens: 100,
+        outputTokens: 50,
+        cacheCreationInputTokens: 0,
+        cacheReadInputTokens: 0,
+      },
+      modelUsage: {
+        "claude-sonnet-4-20250514": {
+          inputTokens: 100,
+          outputTokens: 50,
+          cacheCreationInputTokens: 0,
+          cacheReadInputTokens: 0,
+          webSearchRequests: 0,
+          costUSD: 0.01,
+          contextWindow: 200000,
+        },
+      },
+    });
     store.getState().reset();
 
     const s = store.getState();
     expect(s.totalCost).toBe(0);
     expect(s.totalTurns).toBe(0);
+    expect(s.totalInputTokens).toBe(0);
+    expect(s.totalOutputTokens).toBe(0);
+    expect(s.modelUsage).toBeNull();
   });
 
   it("setSdkSessionId stores the SDK session ID", () => {

@@ -216,15 +216,58 @@ describe("MessageTranslator", () => {
     ]);
   });
 
-  it("emits turn_complete on success result", () => {
+  it("emits turn_complete on success result without usage", () => {
     const t = new MessageTranslator();
     const events = t.translate(
       { type: "result", subtype: "success", num_turns: 3, total_cost_usd: 0.05 },
       session,
     );
     expect(events).toEqual([
-      { event: "turn_complete", data: JSON.stringify({ numTurns: 3, cost: 0.05 }) },
+      {
+        event: "turn_complete",
+        data: JSON.stringify({ numTurns: 3, cost: 0.05, usage: null, modelUsage: null }),
+      },
     ]);
+  });
+
+  it("emits turn_complete with usage and modelUsage when present", () => {
+    const t = new MessageTranslator();
+    const events = t.translate(
+      {
+        type: "result",
+        subtype: "success",
+        num_turns: 5,
+        total_cost_usd: 0.12,
+        usage: {
+          input_tokens: 1000,
+          output_tokens: 500,
+          cache_creation_input_tokens: 200,
+          cache_read_input_tokens: 300,
+        },
+        modelUsage: {
+          "claude-sonnet-4-20250514": {
+            inputTokens: 1000,
+            outputTokens: 500,
+            cacheCreationInputTokens: 200,
+            cacheReadInputTokens: 300,
+            webSearchRequests: 0,
+            costUSD: 0.12,
+            contextWindow: 200000,
+          },
+        },
+      },
+      session,
+    );
+    const data = JSON.parse(events[0].data);
+    expect(data.numTurns).toBe(5);
+    expect(data.cost).toBe(0.12);
+    expect(data.usage).toEqual({
+      inputTokens: 1000,
+      outputTokens: 500,
+      cacheCreationInputTokens: 200,
+      cacheReadInputTokens: 300,
+    });
+    expect(data.modelUsage["claude-sonnet-4-20250514"].costUSD).toBe(0.12);
   });
 
   it("emits session_error on non-success result", () => {
