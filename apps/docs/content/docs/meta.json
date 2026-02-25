@@ -1,0 +1,14 @@
+{
+  "pages": [
+    "index",
+    "---Getting Started---",
+    "server",
+    "client",
+    "---Widgets---",
+    "built-in-widgets",
+    "custom-widgets",
+    "---Reference---",
+    "api-reference",
+    "development"
+  ]
+}
