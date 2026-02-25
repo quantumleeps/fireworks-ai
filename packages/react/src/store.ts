@@ -1,9 +1,11 @@
 import type {
   ChatMessage,
   McpServerStatus,
+  ModelUsage,
   PermissionRequest,
   SSEEvent,
   ToolCallInfo,
+  TurnCompleteData,
 } from "@neeter/types";
 import { immer } from "zustand/middleware/immer";
 import { createStore, type StoreApi } from "zustand/vanilla";
@@ -22,6 +24,9 @@ interface ChatStoreState {
   fileCheckpointing: boolean;
   totalCost: number;
   totalTurns: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  modelUsage: Record<string, ModelUsage> | null;
 }
 
 interface ChatStoreActions {
@@ -45,7 +50,7 @@ interface ChatStoreActions {
   setMcpServers: (servers: McpServerStatus[]) => void;
   addCheckpoint: (uuid: string) => void;
   setFileCheckpointing: (v: boolean) => void;
-  addCost: (cost: number, turns: number) => void;
+  addCost: (data: TurnCompleteData) => void;
   cancelInflightToolCalls: () => void;
   reset: () => void;
 }
@@ -86,6 +91,9 @@ export function createChatStore(): ChatStore {
       fileCheckpointing: false,
       totalCost: 0,
       totalTurns: 0,
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      modelUsage: null,
 
       setSessionId: (id) =>
         set((s) => {
@@ -244,10 +252,34 @@ export function createChatStore(): ChatStore {
           s.fileCheckpointing = v;
         }),
 
-      addCost: (cost, turns) =>
+      addCost: (data) =>
         set((s) => {
-          s.totalCost += cost;
-          s.totalTurns += turns;
+          s.totalCost += data.cost;
+          s.totalTurns += data.numTurns;
+          if (data.usage) {
+            s.totalInputTokens += data.usage.inputTokens;
+            s.totalOutputTokens += data.usage.outputTokens;
+          }
+          if (data.modelUsage) {
+            if (!s.modelUsage) {
+              s.modelUsage = data.modelUsage;
+            } else {
+              for (const [model, usage] of Object.entries(data.modelUsage)) {
+                const existing = s.modelUsage[model];
+                if (existing) {
+                  existing.inputTokens += usage.inputTokens;
+                  existing.outputTokens += usage.outputTokens;
+                  existing.cacheCreationInputTokens += usage.cacheCreationInputTokens;
+                  existing.cacheReadInputTokens += usage.cacheReadInputTokens;
+                  existing.webSearchRequests += usage.webSearchRequests;
+                  existing.costUSD += usage.costUSD;
+                  existing.contextWindow = usage.contextWindow;
+                } else {
+                  s.modelUsage[model] = { ...usage };
+                }
+              }
+            }
+          }
         }),
 
       cancelInflightToolCalls: () =>
@@ -283,6 +315,9 @@ export function createChatStore(): ChatStore {
           s.fileCheckpointing = false;
           s.totalCost = 0;
           s.totalTurns = 0;
+          s.totalInputTokens = 0;
+          s.totalOutputTokens = 0;
+          s.modelUsage = null;
         }),
     })),
   );
@@ -361,7 +396,12 @@ export function replayEvents(
       case "turn_complete":
         s.flushStreamingThinking();
         s.flushStreamingText();
-        s.addCost(data.cost ?? 0, data.numTurns ?? 0);
+        s.addCost({
+          cost: data.cost ?? 0,
+          numTurns: data.numTurns ?? 0,
+          usage: data.usage ?? null,
+          modelUsage: data.modelUsage ?? null,
+        });
         break;
       case "session_error":
         s.flushStreamingThinking();

@@ -117,6 +117,28 @@ export interface RewindFilesResult {
   deletions?: number;
 }
 
+// --- Token Usage ---
+
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationInputTokens: number;
+  cacheReadInputTokens: number;
+}
+
+export interface ModelUsage extends TokenUsage {
+  webSearchRequests: number;
+  costUSD: number;
+  contextWindow: number;
+}
+
+export interface TurnCompleteData {
+  numTurns: number;
+  cost: number;
+  usage: TokenUsage | null;
+  modelUsage: Record<string, ModelUsage> | null;
+}
+
 // --- Persistence ---
 
 export interface SessionRecord {

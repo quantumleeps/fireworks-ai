@@ -212,11 +212,22 @@ export class MessageTranslator<TCtx> {
 
       case "result": {
         if (message.subtype === "success") {
+          const sdkUsage = message.usage as Record<string, unknown> | undefined;
+          const usage = sdkUsage
+            ? {
+                inputTokens: (sdkUsage.input_tokens as number) ?? 0,
+                outputTokens: (sdkUsage.output_tokens as number) ?? 0,
+                cacheCreationInputTokens: (sdkUsage.cache_creation_input_tokens as number) ?? 0,
+                cacheReadInputTokens: (sdkUsage.cache_read_input_tokens as number) ?? 0,
+              }
+            : null;
           events.push({
             event: "turn_complete",
             data: JSON.stringify({
               numTurns: (message as Record<string, unknown>).num_turns ?? 0,
               cost: (message as Record<string, unknown>).total_cost_usd ?? 0,
+              usage,
+              modelUsage: (message as Record<string, unknown>).modelUsage ?? null,
             }),
           });
         } else {

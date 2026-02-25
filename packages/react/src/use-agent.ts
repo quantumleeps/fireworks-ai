@@ -164,12 +164,17 @@ export function useAgent(store: ChatStore, config?: UseAgentConfig): UseAgentRet
     });
 
     es.addEventListener("turn_complete", (e) => {
-      const { cost, numTurns } = JSON.parse(e.data);
+      const data = JSON.parse(e.data);
       store.getState().flushStreamingThinking();
       store.getState().flushStreamingText();
       store.getState().setThinking(false);
       store.getState().setStreaming(false);
-      store.getState().addCost(cost ?? 0, numTurns ?? 0);
+      store.getState().addCost({
+        cost: data.cost ?? 0,
+        numTurns: data.numTurns ?? 0,
+        usage: data.usage ?? null,
+        modelUsage: data.modelUsage ?? null,
+      });
       if (abortedRef.current) {
         store.getState().cancelInflightToolCalls();
         store.getState().addSystemMessage("Interrupted");
