@@ -354,6 +354,109 @@ describe("MessageTranslator", () => {
     expect(data.modelUsage["claude-sonnet-4-20250514"].costUSD).toBe(0.12);
   });
 
+  it("emits cost as per-turn delta (not cumulative) across multiple results", () => {
+    const t = new MessageTranslator();
+    // Turn 1: cumulative cost = 0.05
+    const e1 = t.translate(
+      {
+        type: "result",
+        subtype: "success",
+        num_turns: 1,
+        total_cost_usd: 0.05,
+        stop_reason: "end_turn",
+      },
+      session,
+    );
+    expect(JSON.parse(e1[0].data).cost).toBe(0.05);
+
+    // Turn 2: cumulative cost = 0.12 → delta should be 0.07
+    const e2 = t.translate(
+      {
+        type: "result",
+        subtype: "success",
+        num_turns: 2,
+        total_cost_usd: 0.12,
+        stop_reason: "end_turn",
+      },
+      session,
+    );
+    expect(JSON.parse(e2[0].data).cost).toBeCloseTo(0.07);
+
+    // Turn 3: cumulative cost = 0.20 → delta should be 0.08
+    const e3 = t.translate(
+      {
+        type: "result",
+        subtype: "success",
+        num_turns: 3,
+        total_cost_usd: 0.2,
+        stop_reason: "end_turn",
+      },
+      session,
+    );
+    expect(JSON.parse(e3[0].data).cost).toBeCloseTo(0.08);
+  });
+
+  it("emits modelUsage as per-turn delta across multiple results", () => {
+    const t = new MessageTranslator();
+    const model = "claude-sonnet-4-20250514";
+
+    // Turn 1: cumulative
+    t.translate(
+      {
+        type: "result",
+        subtype: "success",
+        num_turns: 1,
+        total_cost_usd: 0.05,
+        stop_reason: "end_turn",
+        modelUsage: {
+          [model]: {
+            inputTokens: 1000,
+            outputTokens: 500,
+            cacheCreationInputTokens: 200,
+            cacheReadInputTokens: 300,
+            webSearchRequests: 0,
+            costUSD: 0.05,
+            contextWindow: 200000,
+          },
+        },
+      },
+      session,
+    );
+
+    // Turn 2: cumulative values doubled
+    const e2 = t.translate(
+      {
+        type: "result",
+        subtype: "success",
+        num_turns: 2,
+        total_cost_usd: 0.1,
+        stop_reason: "end_turn",
+        modelUsage: {
+          [model]: {
+            inputTokens: 2200,
+            outputTokens: 900,
+            cacheCreationInputTokens: 400,
+            cacheReadInputTokens: 600,
+            webSearchRequests: 1,
+            costUSD: 0.1,
+            contextWindow: 200000,
+          },
+        },
+      },
+      session,
+    );
+    const data = JSON.parse(e2[0].data);
+    expect(data.modelUsage[model]).toEqual({
+      inputTokens: 1200,
+      outputTokens: 400,
+      cacheCreationInputTokens: 200,
+      cacheReadInputTokens: 300,
+      webSearchRequests: 1,
+      costUSD: expect.closeTo(0.05),
+      contextWindow: 200000,
+    });
+  });
+
   it("emits session_error on non-success result with stopReason", () => {
     const t = new MessageTranslator();
     const events = t.translate(
