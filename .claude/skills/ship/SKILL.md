@@ -64,10 +64,13 @@ Draft a PR title and body. The title should match or closely follow the commit s
 <1-3 bullet points explaining the change>
 
 ## Test plan
-<How this was verified>
+- [ ] <verification step as a task list checkbox>
+- [ ] <another verification step>
 
 Closes #N (if applicable)
 ```
+
+Use `- [ ]` task list checkboxes for the test plan — GitHub renders these as interactive checkboxes in the PR UI, and the PR list view shows completion progress (e.g. "2/5 tasks"). Each checkbox should be a concrete verification step (e.g. `- [ ] pnpm check && pnpm build && pnpm test pass`, `- [ ] Manual smoke test of feature X`).
 
 Include GitHub closing references (`Closes #N`, `Fixes #N`) when the change resolves an open issue. Check `gh issue list` or the conversation context for relevant issues. If none apply, omit the line.
 
