@@ -1,4 +1,4 @@
-import type { CustomEvent, SessionInitEvent, SSEEvent } from "@neeter/types";
+import type { CustomEvent, ModelUsage, SessionInitEvent, SSEEvent } from "@neeter/types";
 import { PushChannel } from "./push-channel.js";
 import type { Session } from "./session.js";
 
@@ -14,6 +14,8 @@ export class MessageTranslator<TCtx> {
   private hadStreamThinking = false;
   private hadStreamText = false;
   private lastStreamStopReason: string | null = null;
+  private lastCumulativeCost = 0;
+  private lastModelUsage: Record<string, ModelUsage> = {};
 
   constructor(config?: TranslatorConfig<TCtx>) {
     this.config = config ?? {};
@@ -245,14 +247,27 @@ export class MessageTranslator<TCtx> {
                 cacheReadInputTokens: (sdkUsage.cache_read_input_tokens as number) ?? 0,
               }
             : null;
+
+          // total_cost_usd is cumulative across the long-lived query() call.
+          // Convert to a per-turn delta so the store can sum correctly.
+          const cumulativeCost =
+            ((message as Record<string, unknown>).total_cost_usd as number) ?? 0;
+          const deltaCost = cumulativeCost - this.lastCumulativeCost;
+          this.lastCumulativeCost = cumulativeCost;
+
+          // modelUsage fields are also cumulative — convert to deltas.
+          const rawModelUsage =
+            ((message as Record<string, unknown>).modelUsage as Record<string, ModelUsage>) ?? null;
+          const deltaModelUsage = rawModelUsage ? this.deltaModelUsage(rawModelUsage) : null;
+
           events.push({
             event: "turn_complete",
             data: JSON.stringify({
               numTurns: (message as Record<string, unknown>).num_turns ?? 0,
-              cost: (message as Record<string, unknown>).total_cost_usd ?? 0,
+              cost: deltaCost,
               stopReason,
               usage,
-              modelUsage: (message as Record<string, unknown>).modelUsage ?? null,
+              modelUsage: deltaModelUsage,
             }),
           });
         } else {
@@ -266,6 +281,28 @@ export class MessageTranslator<TCtx> {
     }
 
     return events;
+  }
+
+  private deltaModelUsage(cumulative: Record<string, ModelUsage>): Record<string, ModelUsage> {
+    const delta: Record<string, ModelUsage> = {};
+    for (const [model, usage] of Object.entries(cumulative)) {
+      const prev = this.lastModelUsage[model];
+      if (prev) {
+        delta[model] = {
+          inputTokens: usage.inputTokens - prev.inputTokens,
+          outputTokens: usage.outputTokens - prev.outputTokens,
+          cacheCreationInputTokens: usage.cacheCreationInputTokens - prev.cacheCreationInputTokens,
+          cacheReadInputTokens: usage.cacheReadInputTokens - prev.cacheReadInputTokens,
+          webSearchRequests: usage.webSearchRequests - prev.webSearchRequests,
+          costUSD: usage.costUSD - prev.costUSD,
+          contextWindow: usage.contextWindow,
+        };
+      } else {
+        delta[model] = { ...usage };
+      }
+    }
+    this.lastModelUsage = structuredClone(cumulative);
+    return delta;
   }
 
   private lastToolId(): string | undefined {
