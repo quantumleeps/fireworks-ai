@@ -74,10 +74,10 @@ importers:
     dependencies:
       '@anthropic-ai/claude-agent-sdk':
         specifier: latest
-        version: 0.2.56(zod@4.3.6)
+        version: 0.2.63(zod@4.3.6)
       '@hono/node-server':
         specifier: ^1.14.3
-        version: 1.19.9(hono@4.12.2)
+        version: 1.19.9(hono@4.12.3)
       '@neeter/react':
         specifier: workspace:*
         version: link:../../packages/react
@@ -88,8 +88,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/types
       hono:
-        specifier: ^4.12.2
-        version: 4.12.2
+        specifier: ^4.12.3
+        version: 4.12.3
       immer:
         specifier: ^11.1.4
         version: 11.1.4
@@ -147,10 +147,10 @@ importers:
     dependencies:
       '@anthropic-ai/claude-agent-sdk':
         specifier: latest
-        version: 0.2.56(zod@4.3.6)
+        version: 0.2.63(zod@4.3.6)
       '@hono/node-server':
         specifier: ^1.14.3
-        version: 1.19.9(hono@4.12.2)
+        version: 1.19.9(hono@4.12.3)
       '@neeter/react':
         specifier: workspace:*
         version: link:../../packages/react
@@ -161,8 +161,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/types
       hono:
-        specifier: ^4.12.2
-        version: 4.12.2
+        specifier: ^4.12.3
+        version: 4.12.3
       immer:
         specifier: ^11.1.4
         version: 11.1.4
@@ -275,8 +275,8 @@ importers:
         specifier: ^25.3.0
         version: 25.3.0
       hono:
-        specifier: ^4.12.2
-        version: 4.12.2
+        specifier: ^4.12.3
+        version: 4.12.3
 
   packages/types: {}
 
@@ -292,8 +292,8 @@ packages:
     peerDependencies:
       zod: ^4.0.0
 
-  '@anthropic-ai/claude-agent-sdk@0.2.56':
-    resolution: {integrity: sha512-EpDeAUlhFIAWOfps7fWdAAmJgMvqmISODyPFVbvgfL17EHFTHF1cpPiZQEQYjzUcUXE8nvcVxQlBzuMukHqItA==}
+  '@anthropic-ai/claude-agent-sdk@0.2.63':
+    resolution: {integrity: sha512-ZNiaQb/v6xkbrGt3dtq5J0DGY+AaOhoehUyposa3msvlAlkTHWNGR+NhbCcTE0ML1U91xhPqMAAwZIUqrlkKyQ==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       zod: ^4.0.0
@@ -2042,8 +2042,8 @@ packages:
   hastscript@9.0.1:
     resolution: {integrity: sha512-g7df9rMFX/SPi34tyGCyUBREQoKkapwdY/T04Qn9TDWfHhAYt4/I0gMVirzK5wEzeUqIjEB+LXC/ypb7Aqno5w==}
 
-  hono@4.12.2:
-    resolution: {integrity: sha512-gJnaDHXKDayjt8ue0n8Gs0A007yKXj4Xzb8+cNjZeYsSzzwKc0Lr+OZgYwVfB0pHfUs17EPoLvrOsEaJ9mj+Tg==}
+  hono@4.12.3:
+    resolution: {integrity: sha512-SFsVSjp8sj5UumXOOFlkZOG6XS9SJDKw0TbwFeV+AJ8xlST8kxK5Z/5EYa111UY8732lK2S/xB653ceuaoGwpg==}
     engines: {node: '>=16.9.0'}
 
   html-encoding-sniffer@4.0.0:
@@ -3102,7 +3102,7 @@ snapshots:
       '@img/sharp-win32-arm64': 0.34.5
       '@img/sharp-win32-x64': 0.34.5
 
-  '@anthropic-ai/claude-agent-sdk@0.2.56(zod@4.3.6)':
+  '@anthropic-ai/claude-agent-sdk@0.2.63(zod@4.3.6)':
     dependencies:
       zod: 4.3.6
     optionalDependencies:
@@ -3408,9 +3408,9 @@ snapshots:
     optionalDependencies:
       tailwindcss: 4.2.1
 
-  '@hono/node-server@1.19.9(hono@4.12.2)':
+  '@hono/node-server@1.19.9(hono@4.12.3)':
     dependencies:
-      hono: 4.12.2
+      hono: 4.12.3
 
   '@img/colour@1.0.0':
     optional: true
@@ -4782,7 +4782,7 @@ snapshots:
       property-information: 7.1.0
       space-separated-tokens: 2.0.2
 
-  hono@4.12.2: {}
+  hono@4.12.3: {}
 
   html-encoding-sniffer@4.0.0:
     dependencies:
