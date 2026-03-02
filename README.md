@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/quantumleeps/neeter/actions/workflows/ci.yml/badge.svg)](https://github.com/quantumleeps/neeter/actions/workflows/ci.yml)
 [![npm @neeter/server](https://img.shields.io/npm/v/@neeter/server?label=%40neeter%2Fserver)](https://www.npmjs.com/package/@neeter/server)
+[![npm @neeter/core](https://img.shields.io/npm/v/@neeter/core?label=%40neeter%2Fcore)](https://www.npmjs.com/package/@neeter/core)
 [![npm @neeter/react](https://img.shields.io/npm/v/@neeter/react?label=%40neeter%2Freact)](https://www.npmjs.com/package/@neeter/react)
 [![npm @neeter/types](https://img.shields.io/npm/v/@neeter/types?label=%40neeter%2Ftypes)](https://www.npmjs.com/package/@neeter/types)
 [![license](https://img.shields.io/npm/l/@neeter/server)](./LICENSE)
@@ -50,7 +51,7 @@ Edit diffs, web search with favicon pills, bash output, todo checklists, extende
 pnpm add @neeter/server
 
 # Client
-pnpm add @neeter/react
+pnpm add @neeter/core @neeter/react
 ```
 
 Peer dependencies — **server**:
@@ -162,7 +163,7 @@ The spirograph studio above was built by Opus 4.6 using the [code-workbench](exa
 | [Client Guide](https://quantumleeps.github.io/neeter/docs/client) | Styling, custom events, widgets, tool lifecycle, SSE protocol |
 | [Built-in Widgets](https://quantumleeps.github.io/neeter/docs/built-in-widgets) | The 11 SDK tool widgets and how to override them |
 | [Custom Widgets](https://quantumleeps.github.io/neeter/docs/custom-widgets) | Registering your own tool widgets |
-| [API Reference](https://quantumleeps.github.io/neeter/docs/api-reference) | All exports and types for server, react, and types packages |
+| [API Reference](https://quantumleeps.github.io/neeter/docs/api-reference) | All exports and types for server, core, react, and types packages |
 | [Development](https://quantumleeps.github.io/neeter/docs/development) | Local setup, pre-commit hooks, CI |
 
 ## License
