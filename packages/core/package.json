@@ -1,6 +1,6 @@
 {
   "name": "@neeter/core",
-  "version": "0.17.4",
+  "version": "0.18.0",
   "description": "Framework-agnostic state management and agent lifecycle for neeter",
   "license": "MIT",
   "author": "Dan Leeper",
