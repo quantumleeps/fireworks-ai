@@ -50,8 +50,11 @@ Edit diffs, web search with favicon pills, bash output, todo checklists, extende
 # Server
 pnpm add @neeter/server
 
-# Client
-pnpm add @neeter/react
+# Client (React — includes ready-made components)
+pnpm add @neeter/core @neeter/react
+
+# Client (vanilla TypeScript — no framework)
+pnpm add @neeter/core
 ```
 
 Peer dependencies — **server**:
@@ -63,7 +66,7 @@ Peer dependencies — **server**:
 }
 ```
 
-Peer dependencies — **client**:
+Peer dependencies — **@neeter/react**:
 
 ```json
 {
@@ -72,6 +75,15 @@ Peer dependencies — **client**:
   "zustand": ">=5.0.0",
   "immer": ">=10.0.0",
   "tailwindcss": ">=4.0.0"
+}
+```
+
+Peer dependencies — **@neeter/core** (standalone):
+
+```json
+{
+  "zustand": ">=5.0.0",
+  "immer": ">=10.0.0"
 }
 ```
 
@@ -111,7 +123,7 @@ serve({ fetch: app.fetch, port: 3000 });
 
 > Endpoints, session context, permissions, extended thinking, persistence, and sandbox hooks are covered in the [Server Guide](https://quantumleeps.github.io/neeter/docs/server).
 
-### Client
+### Client (React)
 
 ```tsx
 import { AgentProvider, MessageList, ChatInput, useAgentContext } from "@neeter/react";
@@ -138,6 +150,28 @@ function Chat() {
 
 Components use Tailwind utility classes and accept `className` for overrides.
 
+### Client (vanilla TypeScript)
+
+```typescript
+import { AgentClient, createChatStore } from "@neeter/core";
+
+const store = createChatStore();
+const client = new AgentClient(store, { endpoint: "/api" });
+
+await client.connect();
+client.attachEventSource();
+
+// Re-render on every state change
+store.subscribe((state) => {
+  document.getElementById("messages")!.innerHTML =
+    state.messages.map((m) => `<div>${m.content}</div>`).join("");
+});
+
+await client.sendMessage("Hello!");
+```
+
+`AgentClient` is framework-agnostic — use it with Vue, Svelte, Web Components, or plain DOM APIs.
+
 > Styling, custom events, widgets, and the SSE protocol are covered in the [Client Guide](https://quantumleeps.github.io/neeter/docs/client).
 
 ## What you can build
@@ -152,7 +186,8 @@ The spirograph studio above was built by Opus 4.6 using the [code-workbench](exa
 
 | Example | Description |
 |---------|-------------|
-| **[basic-chat](examples/basic-chat)** | Minimal chat UI — `AgentProvider` + `MessageList` + `ChatInput` |
+| **[basic-chat](examples/basic-chat)** | Minimal React chat UI — `AgentProvider` + `MessageList` + `ChatInput` |
+| **[vanilla-chat](examples/vanilla-chat)** | Same chat UI using `@neeter/core` directly — no React, plain TypeScript + DOM APIs |
 | **[code-workbench](examples/code-workbench)** | Split-pane coding assistant with live preview, per-session sandboxes, persistence, file checkpointing, and code viewer |
 
 ## Documentation
